@@ -14,6 +14,7 @@
   LED verde   D5 -> 220 -> 220 -> LED(+) ; LED(-) -> GND
   LED rojo    D4 -> 220 -> 220 -> LED(+) ; LED(-) -> GND
   Buzzer      (+)->D3  (-)->GND   (buzzer activo)
+  HC-SR04     VCC->5V  TRIG->D7  ECHO->D8  GND->GND
 
   ORDENES (9600, por Bluetooth o USB, una por linea)
   CODIGO:1234        entrar con el codigo
@@ -25,10 +26,12 @@
   TARJ:UID:admin:activa:NOMBRE   BORRAR:UID   BORRARTODO   LISTA
   TIEMPO:n (s abierta 2-60)  BLOQUEO:n (s 10-600)  INTENTOS:n (2-9)  ANGULO:n (30-180)
   LUZ:0/1/2 (blanca apagada/prendida/automatica)  SONIDO:0/1  PITAR  PRUEBA  ESTADO  REINICIAR
+  DIST:n (cm para detectar a alguien, 5-200)  MERODEO:n (s parado frente a la puerta para avisar, 0 = no avisar)
 
   MENSAJES QUE ENVIA
   ST,estado,abierta,restante,verde,rojo,blanca,modoLuz,fallos,intentos,bloqueoRest,nTarj,sonido,
-     tiempo,bloqueoSeg,angulo,lcdOk,rfidOk,registrando,mantener      (cada 1 s y con cada cambio)
+     tiempo,bloqueoSeg,angulo,lcdOk,rfidOk,registrando,mantener,distancia,presencia,distDetectar,merodeo,ultraOk
+     (cada 1 s y con cada cambio; distancia 999 = nada al frente)
      estado: 0 cerrada, 1 abierta, 2 bloqueo por intentos, 3 bloqueada a mano, 4 alarma (panico)
   EV,texto        lo que pasa
   TJ,uid,ok,nombre,motivo     cada tarjeta pasada
@@ -46,9 +49,9 @@
 
 #define BT Serial1
 
-const byte P_BUZ = 3, P_ROJO = 4, P_VERDE = 5, P_BLANCA = 6, P_SERVO = 9, P_SS = 10;
+const byte P_BUZ = 3, P_ROJO = 4, P_VERDE = 5, P_BLANCA = 6, P_TRIG = 7, P_ECHO = 8, P_SERVO = 9, P_SS = 10;
 const byte MAX_TARJ = 10;
-const byte FIRMA = 0xD1;
+const byte FIRMA = 0xD2;
 
 MFRC522 rfid(P_SS, MFRC522::UNUSED_PIN);
 Servo servo;
@@ -64,6 +67,7 @@ struct Ajustes {
   char pin[7];
   byte tiempo, intentos, angulo, modoLuz, sonido;
   uint16_t bloqueo;
+  byte dist, merodeo;
   byte n;
   Tarjeta t[MAX_TARJ];
 } A;
@@ -72,7 +76,7 @@ void guardar() { EEPROM.put(0, A); }
 void porDefecto() {
   memset(&A, 0, sizeof(A));
   A.firma = FIRMA; strcpy(A.pin, "1234");
-  A.tiempo = 5; A.intentos = 3; A.angulo = 90; A.modoLuz = 2; A.sonido = 1; A.bloqueo = 30; A.n = 0;
+  A.tiempo = 5; A.intentos = 3; A.angulo = 90; A.modoLuz = 2; A.sonido = 1; A.bloqueo = 30; A.dist = 40; A.merodeo = 20; A.n = 0;
   guardar();
 }
 void cargar() {
@@ -92,6 +96,10 @@ int anguloActual = 0;
 unsigned long servoSoltar = 0;
 String linUsb, linBt;
 bool cambio = true;
+// ---- ultrasonico ----
+int distancia = 999;            // cm (999 = nada al frente)
+bool presencia = false, ultraOk = true, avisoMerodeo = false;
+unsigned long presenciaDesde = 0, sinEco = 0;
 
 // ---------- salida a los dos puertos ----------
 void enviar(const String &s) { Serial.println(s); BT.println(s); }
@@ -287,7 +295,8 @@ void enviarEstado() {
          String(digitalRead(P_VERDE)) + "," + String(digitalRead(P_ROJO)) + "," + String(digitalRead(P_BLANCA)) + "," +
          String(A.modoLuz) + "," + String(fallos) + "," + String(A.intentos) + "," + String(bres) + "," +
          String(A.n) + "," + String(A.sonido) + "," + String(A.tiempo) + "," + String(A.bloqueo) + "," +
-         String(A.angulo) + "," + String(lcd != nullptr) + "," + String(rfidOk) + "," + String(registrando) + "," + String(mantener));
+         String(A.angulo) + "," + String(lcd != nullptr) + "," + String(rfidOk) + "," + String(registrando) + "," + String(mantener) + "," +
+         String(distancia) + "," + String(presencia) + "," + String(A.dist) + "," + String(A.merodeo) + "," + String(ultraOk));
 }
 
 String limpiar(String s) { s.replace(",", " "); s.trim(); return s.substring(0, 10); }
@@ -375,11 +384,13 @@ void orden(String s) {
   else if (cmd == "LUZ") { A.modoLuz = constrain(n, 0, 2); guardar(); evento(String("Luz blanca: ") + (A.modoLuz == 0 ? "apagada" : A.modoLuz == 1 ? "prendida" : "automatica")); }
   else if (cmd == "SONIDO") { A.sonido = n ? 1 : 0; guardar(); evento(A.sonido ? "Sonido activado" : "Sonido silenciado (la alarma de panico si suena)"); }
   else if (cmd == "PITAR") { bool s = A.sonido; A.sonido = 1; digitalWrite(P_BUZ, HIGH); delay(150); digitalWrite(P_BUZ, LOW); A.sonido = s; evento("Pitido de prueba"); }
+  else if (cmd == "DIST") { A.dist = constrain(n, 5, 200); guardar(); evento("Detecta personas a menos de " + String(A.dist) + " cm"); }
+  else if (cmd == "MERODEO") { A.merodeo = constrain(n, 0, 250); guardar(); evento(A.merodeo ? "Aviso si alguien se queda " + String(A.merodeo) + " s frente a la puerta" : "Aviso de merodeo apagado"); }
   else if (cmd == "TECLA") { sonar(6); luzBlanca(10); }          // alguien esta escribiendo el codigo
   else if (cmd == "PRUEBA") prueba();
   else if (cmd == "REINICIAR") { evento("Ajustes de fabrica: codigo 1234, sin tarjetas"); porDefecto(); estado = CERRADA; fallos = 0; enviarLista(); }
   else if (cmd == "ESTADO") {
-    evento(String("Puerta de seguridad lista. LCD ") + (lcd ? "OK" : "NO ENCONTRADA") + ", RFID " + (rfidOk ? "OK" : "NO ENCONTRADO") + ", " + String(A.n) + " tarjetas");
+    evento(String("Puerta de seguridad lista. LCD ") + (lcd ? "OK" : "NO ENCONTRADA") + ", RFID " + (rfidOk ? "OK" : "NO ENCONTRADO") + ", ultrasonico " + (ultraOk ? "OK" : "SIN LECTURA") + ", " + String(A.n) + " tarjetas");
     l1 = ""; pantalla(l1, l2);
   }
   else if (cmd.length()) { evento("Orden desconocida: " + s); return; }
@@ -394,11 +405,63 @@ void leer(Stream &p, String &lin) {
   }
 }
 
+// ---------- sensor ultrasonico ----------
+int medir() {
+  digitalWrite(P_TRIG, LOW); delayMicroseconds(3);
+  digitalWrite(P_TRIG, HIGH); delayMicroseconds(10);
+  digitalWrite(P_TRIG, LOW);
+  unsigned long d = pulseIn(P_ECHO, HIGH, 15000UL);   // hasta unos 2,5 m
+  if (d == 0) return -1;                               // sin eco
+  return d / 58;
+}
+void ultrasonico() {
+  static unsigned long t = 0;
+  static int m[3] = {999, 999, 999};
+  static byte im = 0;
+  static unsigned long cercaDesde = 0, lejosDesde = 0;
+  unsigned long ahora = millis();
+  if (ahora - t < 80) return;
+  t = ahora;
+  int d = medir();
+  if (d < 0) { d = 999; if (!sinEco) sinEco = ahora; } else sinEco = 0;
+  if (d < 2) d = 999;
+  // si nunca hay eco en 30 s puede estar desconectado (o no hay nada delante)
+  bool ok = !(sinEco && ahora - sinEco > 30000);
+  if (ok != ultraOk) { ultraOk = ok; cambio = true; if (!ok) evento("El sensor ultrasonico no da lecturas desde hace 30 s (revisa TRIG D7 y ECHO D8)"); else evento("Sensor ultrasonico funcionando"); }
+  m[im] = d; im = (im + 1) % 3;
+  int a = m[0], b = m[1], c = m[2];
+  distancia = max(min(a, b), min(max(a, b), c));        // mediana: un eco falso no cuenta
+  bool cerca = distancia <= A.dist;
+  if (cerca) { lejosDesde = 0; if (!cercaDesde) cercaDesde = ahora; }
+  else { cercaDesde = 0; if (!lejosDesde) lejosDesde = ahora; }
+  // 0,3 s cerca para detectar, 1,5 s lejos para que se fue
+  if (!presencia && cercaDesde && ahora - cercaDesde > 300) {
+    presencia = true; presenciaDesde = ahora; avisoMerodeo = false; cambio = true;
+    luzBlanca(10);
+    evento("Persona frente a la puerta (" + String(distancia) + " cm)");
+    if (estado == CERRADA && !registrando && ahora > msgHasta) { mensaje("   BIENVENIDO", "Pase su tarjeta", 3000); sonar(6); }
+  }
+  if (presencia && lejosDesde && ahora - lejosDesde > 1500) {
+    presencia = false; cambio = true;
+    evento("La persona se fue (estuvo " + String((ahora - presenciaDesde) / 1000) + " s)");
+  }
+  if (presencia) {
+    luzBlanca(5);
+    if (A.merodeo && !avisoMerodeo && estado != ABIERTA && ahora - presenciaDesde > A.merodeo * 1000UL) {
+      avisoMerodeo = true; cambio = true;
+      sonar(5);
+      mensaje("Persona sin", "identificarse", 3000);
+      evento("AVISO: una persona lleva " + String(A.merodeo) + " s frente a la puerta sin entrar");
+    }
+  }
+}
+
 // ---------- setup / loop ----------
 void setup() {
   Serial.begin(9600);
   BT.begin(9600);
   pinMode(P_BUZ, OUTPUT); pinMode(P_ROJO, OUTPUT); pinMode(P_VERDE, OUTPUT); pinMode(P_BLANCA, OUTPUT);
+  pinMode(P_TRIG, OUTPUT); pinMode(P_ECHO, INPUT); digitalWrite(P_TRIG, LOW);
   cargar();
   matriz.begin();
   dibujar(0);
@@ -414,6 +477,7 @@ void setup() {
   delay(120); digitalWrite(P_BUZ, LOW); delay(600);
   digitalWrite(P_BLANCA, LOW); digitalWrite(P_VERDE, LOW); digitalWrite(P_ROJO, LOW);
   evento("Puerta de seguridad lista");
+  evento(String("Sensor ultrasonico: ") + (medir() < 0 ? "sin eco (nada delante o desconectado)" : "listo"));
   evento(rfidOk ? "Lector RFID listo (" + String(A.n) + " tarjetas)" : "No se encuentra el lector RFID: revisa sus cables (va a 3.3V)");
   if (!lcd) evento("No se encuentra la pantalla LCD: revisa SDA, SCL y 5V");
   if (A.n == 0) evento("No hay tarjetas: la primera que registres sera administrador");
@@ -441,7 +505,15 @@ void loop() {
   }
 
   if (registrando && ahora > regHasta) { registrando = false; msgHasta = 0; evento("Registro cancelado (no se acerco ninguna tarjeta)"); cambio = true; }
-  if (estado == ABIERTA && !mantener && (long)(ahora - cerrarEn) >= 0) cerrar("tiempo cumplido");
+  ultrasonico();
+  if (estado == ABIERTA && !mantener && (long)(ahora - cerrarEn) >= 0) {
+    if (presencia && distancia <= 15) {               // alguien pasando justo por la puerta
+      cerrarEn = ahora + 2000;
+      static unsigned long tAviso = 0;
+      if (ahora - tAviso > 5000) { tAviso = ahora; evento("No se cierra: hay alguien pasando por la puerta"); }
+      mensaje("PUERTA OCUPADA", "esperando...", 1500);
+    } else cerrar("tiempo cumplido");
+  }
   if (estado == BLOQ_INTENTOS && (long)(ahora - bloqueoHasta) >= 0) { estado = CERRADA; fallos = 0; evento("Fin del bloqueo: se puede intentar de nuevo"); cambio = true; }
   if (estado != ABIERTA) anguloMeta = 0;
   moverServo();

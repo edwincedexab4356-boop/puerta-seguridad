@@ -142,6 +142,15 @@ td,th{border-bottom:1px solid var(--line);padding:7px 6px;text-align:left;vertic
 th{color:var(--mute);font-weight:600;font-size:12px}
 td code{font-family:ui-monospace,Consolas,monospace;color:var(--amb)}
 
+.persona{position:absolute;left:50%;bottom:6px;transform:translateX(-50%);z-index:3;transition:font-size .4s,opacity .4s;line-height:1;filter:drop-shadow(0 4px 6px #000a);pointer-events:none}
+.ultra{margin-top:12px;display:grid;grid-template-columns:auto 1fr;gap:6px 12px;align-items:center;background:#16191d;border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.ultra .dist{font:700 22px/1 ui-monospace,Consolas,monospace;color:var(--azul)}
+.ultra .barra{height:8px;border-radius:99px;background:#0c0d10;position:relative;overflow:hidden}
+.ultra .barra i{position:absolute;left:0;top:0;bottom:0;background:var(--azul);border-radius:99px;transition:width .2s}
+.ultra .barra b{position:absolute;top:0;bottom:0;width:2px;background:var(--amb)}
+.ultra input[type=range]{grid-column:1/-1;padding:0;accent-color:var(--azul)}
+.ultra .bts{grid-column:1/-1;display:flex;gap:6px;flex-wrap:wrap}
+.ultra .bts button{flex:1;padding:7px 8px;font-size:13px}
 .banner{display:none;margin:0 16px;padding:12px 16px;border-radius:12px;background:#3a1414;border:1px solid #a33;color:#ffd7d7;font-weight:600;text-align:center}
 .banner.ver{display:block;animation:latir 1s infinite}
 @keyframes latir{50%{background:#5a1818}}
@@ -154,7 +163,7 @@ td code{font-family:ui-monospace,Consolas,monospace;color:var(--amb)}
 <header>
   <div class="logo">
     <svg viewBox="0 0 32 32" fill="none"><rect x="5" y="13" width="22" height="16" rx="3" fill="#f2a93b"/><path d="M10 13V9a6 6 0 0 1 12 0v4" stroke="#f2a93b" stroke-width="3"/><circle cx="16" cy="20" r="2.4" fill="#1b1305"/><rect x="15" y="21" width="2" height="4" fill="#1b1305"/></svg>
-    <div>Puerta de Seguridad<small>RFID · código · Bluetooth HC-05 · UNO R4 WiFi</small></div>
+    <div>Puerta de Seguridad<small>RFID · código · ultrasónico · Bluetooth HC-05 · UNO R4 WiFi</small></div>
   </div>
   <div class="con">
     <span id="modo" class="pill">Simulación</span>
@@ -173,6 +182,7 @@ td code{font-family:ui-monospace,Consolas,monospace;color:var(--amb)}
         <div id="marco" class="marco">
           <div class="otro-lado">Zona segura<br>🔒</div>
           <div class="hoja"><div class="panel p1"></div><div class="panel p2"></div><div class="manija"></div><div class="letrero">ACCESO RESTRINGIDO</div></div>
+          <div id="persona" class="persona" style="opacity:0">🧍</div>
           <div class="cerrojo" title="Servomotor (cerrojo)">
             <svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="7" fill="#555c66"/><g id="brazo"><rect x="17" y="3" width="6" height="19" rx="3" fill="#e9e9e9"/></g><circle cx="20" cy="20" r="3" fill="#222"/></svg>
           </div>
@@ -192,6 +202,12 @@ td code{font-family:ui-monospace,Consolas,monospace;color:var(--amb)}
       <div id="lcd" class="lcd"> PUERTA SEGURA
 Tarjeta o codigo</div>
       <div class="estado-grande"><b id="estTxt">CERRADA</b><span id="estChip" class="chip"></span><span id="intChip" class="chip"></span></div>
+      <div class="ultra">
+        <div><div class="nota" style="font-size:12px">Sensor ultrasónico</div><div class="dist" id="uDist">— cm</div></div>
+        <div><div class="nota" id="uTxt" style="font-size:13px;margin-bottom:6px">Nadie frente a la puerta</div><div class="barra"><i id="uBar"></i><b id="uMarca"></b></div></div>
+        <input type="range" id="uSlider" min="2" max="200" value="200" aria-label="Distancia de la persona (simulación)">
+        <div class="bts" id="uBts"><button data-d="200">Nadie</button><button data-d="120">Lejos</button><button data-d="30">Frente a la puerta</button><button data-d="8">Pasando</button></div>
+      </div>
     </div>
 
     <div class="card">
@@ -266,6 +282,8 @@ Tarjeta o codigo</div>
         <div class="campo"><label for="aTiempo">Segundos abierta</label><div class="fila"><input type="number" id="aTiempo" min="2" max="60"><button data-a="TIEMPO" style="flex:0 0 auto">Guardar</button></div></div>
         <div class="campo"><label for="aIntentos">Intentos antes del bloqueo</label><div class="fila"><input type="number" id="aIntentos" min="2" max="9"><button data-a="INTENTOS" style="flex:0 0 auto">Guardar</button></div></div>
         <div class="campo"><label for="aBloqueo">Segundos de bloqueo</label><div class="fila"><input type="number" id="aBloqueo" min="10" max="600"><button data-a="BLOQUEO" style="flex:0 0 auto">Guardar</button></div></div>
+        <div class="campo"><label for="aDist">Distancia para detectar (cm)</label><div class="fila"><input type="number" id="aDist" min="5" max="200"><button data-a="DIST" style="flex:0 0 auto">Guardar</button></div></div>
+        <div class="campo"><label for="aMerodeo">Aviso si alguien se queda (s, 0 = no)</label><div class="fila"><input type="number" id="aMerodeo" min="0" max="250"><button data-a="MERODEO" style="flex:0 0 auto">Guardar</button></div></div>
         <div class="campo"><label for="aAngulo">Ángulo del servo al abrir</label><div class="fila"><input type="number" id="aAngulo" min="30" max="180"><button data-a="ANGULO" style="flex:0 0 auto">Guardar</button></div></div>
       </div>
       <div class="sep"></div>
@@ -326,15 +344,17 @@ Tarjeta o codigo</div>
         <tr><td>LED verde</td><td>pata larga (+)</td><td><code>D5</code> → 220 Ω → 220 Ω → LED; pata corta → GND</td></tr>
         <tr><td>LED rojo</td><td>pata larga (+)</td><td><code>D4</code> → 220 Ω → 220 Ω → LED; pata corta → GND</td></tr>
         <tr><td>Buzzer activo</td><td>+ / −</td><td><code>D3</code> / <code>GND</code></td></tr>
+        <tr><td rowspan="2">Ultrasónico HC-SR04</td><td>VCC / GND</td><td><code>5V</code> / <code>GND</code></td></tr>
+        <tr><td>TRIG / ECHO</td><td><code>D7</code> / <code>D8</code></td></tr>
       </table>
-      <p class="nota">La matriz de luces del R4 muestra un candado cerrado, abierto o una ✕. Para conectar por Bluetooth, empareja primero el HC-05 en el celular o la PC (clave <b>1234</b> o <b>0000</b>) y usa Chrome o Edge. En iPhone no funciona.</p>
+      <p class="nota">El ultrasónico mira hacia afuera, a la altura de una persona: prende la luz cuando alguien llega, no deja cerrar la puerta si alguien está pasando (menos de 15 cm) y avisa si alguien se queda parado sin entrar. La matriz de luces del R4 muestra un candado cerrado, abierto o una ✕. Para conectar por Bluetooth, empareja primero el HC-05 en el celular o la PC (clave <b>1234</b> o <b>0000</b>) y usa Chrome o Edge. En iPhone no funciona.</p>
       <h2 style="margin-top:14px">Materiales</h2>
       <table>
         <tr><td>Arduino UNO R4 WiFi</td><td>1</td></tr><tr><td>Lector RFID RC522 + tarjeta y llavero</td><td>1</td></tr>
         <tr><td>Módulo Bluetooth HC-05</td><td>1</td></tr><tr><td>Pantalla LCD 16×2 con módulo I2C</td><td>1</td></tr>
         <tr><td>Servomotor SG90</td><td>1</td></tr><tr><td>LED blanco, LED verde, LED rojo</td><td>1 de cada uno</td></tr>
-        <tr><td>Buzzer activo</td><td>1</td></tr><tr><td>Resistencias de 220 Ω</td><td>9 (6 de los LEDs + 3 del divisor)</td></tr>
-        <tr><td>Protoboard</td><td>1</td></tr><tr><td>Cables macho–hembra</td><td>15 (RC522 7, HC-05 4, LCD 4)</td></tr>
+        <tr><td>Buzzer activo</td><td>1</td></tr><tr><td>Sensor ultrasónico HC-SR04</td><td>1</td></tr><tr><td>Resistencias de 220 Ω</td><td>9 (6 de los LEDs + 3 del divisor)</td></tr>
+        <tr><td>Protoboard</td><td>1</td></tr><tr><td>Cables macho–hembra</td><td>19 (RC522 7, HC-05 4, LCD 4, HC-SR04 4)</td></tr>
         <tr><td>Cables macho–macho</td><td>unos 20</td></tr>
       </table>
     </div>
@@ -352,7 +372,7 @@ const hora = () => new Date().toLocaleTimeString('es', {hour:'2-digit', minute:'
 /* ================= Estado que muestra la página (llega por ST/LC/TL) ================= */
 const S = {
   modo:'sim', estado:0, abierta:0, restante:0, verde:0, rojo:0, blanca:0, modoLuz:2, fallos:0, intentos:3,
-  bloqRest:0, nTarj:0, sonido:1, tiempo:5, bloqueo:30, angulo:90, lcdOk:1, rfidOk:1, registrando:0, mantener:0,
+  bloqRest:0, nTarj:0, sonido:1, tiempo:5, bloqueo:30, angulo:90, lcdOk:1, rfidOk:1, registrando:0, mantener:0, dist:999, presencia:0, distDet:40, merodeo:20, ultraOk:1,
   l1:' PUERTA SEGURA', l2:'Tarjeta o codigo', lista:[], ultimoST:Date.now(), buzzer:false
 };
 const NOMBRE_EST = ['CERRADA','ABIERTA','BLOQUEADA (intentos)','BLOQUEADA','ALARMA'];
@@ -360,12 +380,13 @@ const NOMBRE_EST = ['CERRADA','ABIERTA','BLOQUEADA (intentos)','BLOQUEADA','ALAR
 /* ================= Arduino virtual (mismas reglas que el .ino) ================= */
 const GUARDADO = 'puerta-seguridad-va-v1';
 const VA = Object.assign({
-  pin:'1234', tiempo:5, intentos:3, angulo:90, modoLuz:2, sonido:1, bloqueo:30,
+  pin:'1234', tiempo:5, intentos:3, angulo:90, modoLuz:2, sonido:1, bloqueo:30, dist:40, merodeo:20,
   t:[{uid:'A3F1220C', admin:1, activa:1, nombre:'Edwin'}, {uid:'5B7C9E11', admin:0, activa:1, nombre:'Visitante'}]
 }, JSON.parse(localStorage.getItem(GUARDADO) || '{}'));
 const V = { estado:0, mantener:false, cerrarEn:0, bloqueoHasta:0, blancaHasta:0, regHasta:0, fallos:0,
-  registrando:false, regAdmin:false, regNombre:'', msgHasta:0, l1:'', l2:'', meta:0, ang:0, patron:0, patronIni:0, vivo:true };
-const vGuardar = () => localStorage.setItem(GUARDADO, JSON.stringify({pin:VA.pin, tiempo:VA.tiempo, intentos:VA.intentos, angulo:VA.angulo, modoLuz:VA.modoLuz, sonido:VA.sonido, bloqueo:VA.bloqueo, t:VA.t}));
+  registrando:false, regAdmin:false, regNombre:'', msgHasta:0, l1:'', l2:'', meta:0, ang:0, patron:0, patronIni:0, vivo:true,
+  persona:200, dist:999, presencia:false, cercaDesde:0, lejosDesde:0, presDesde:0, merodeoAvisado:false, pasoDesde:0, tOcup:0 };
+const vGuardar = () => localStorage.setItem(GUARDADO, JSON.stringify({pin:VA.pin, tiempo:VA.tiempo, intentos:VA.intentos, angulo:VA.angulo, modoLuz:VA.modoLuz, sonido:VA.sonido, bloqueo:VA.bloqueo, dist:VA.dist, merodeo:VA.merodeo, t:VA.t}));
 const ms = () => Date.now();
 const vEnviar = s => setTimeout(() => recibirLinea(s), 30);
 const vEvento = s => vEnviar('EV,' + s);
@@ -470,10 +491,12 @@ function vOrden(s){
   else if (cmd === 'LUZ') { VA.modoLuz = clamp(n, 0, 2); vGuardar(); vEvento('Luz blanca: ' + ['apagada','prendida','automatica'][VA.modoLuz]); }
   else if (cmd === 'SONIDO') { VA.sonido = n ? 1 : 0; vGuardar(); vEvento(VA.sonido ? 'Sonido activado' : 'Sonido silenciado (la alarma de panico si suena)'); }
   else if (cmd === 'PITAR') { pitido(2700, 150, 0, true); S.buzzer = true; setTimeout(() => S.buzzer = false, 150); vEvento('Pitido de prueba'); }
+  else if (cmd === 'DIST') { VA.dist = clamp(n, 5, 200); vGuardar(); vEvento('Detecta personas a menos de ' + VA.dist + ' cm'); }
+  else if (cmd === 'MERODEO') { VA.merodeo = clamp(n, 0, 250); vGuardar(); vEvento(VA.merodeo ? 'Aviso si alguien se queda ' + VA.merodeo + ' s frente a la puerta' : 'Aviso de merodeo apagado'); }
   else if (cmd === 'TECLA') { vSonar(6); vLuz(10); }
   else if (cmd === 'PRUEBA') { vEvento('Prueba de luces, buzzer y servo'); vMensaje('PRUEBA', 'luces y servo', 2500); V.prueba = ms(); }
-  else if (cmd === 'REINICIAR') { vEvento('Ajustes de fabrica: codigo 1234, sin tarjetas'); Object.assign(VA, {pin:'1234', tiempo:5, intentos:3, angulo:90, modoLuz:2, sonido:1, bloqueo:30, t:[]}); vGuardar(); V.estado = 0; V.fallos = 0; vLista(); }
-  else if (cmd === 'ESTADO') { vEvento('Puerta de seguridad lista. LCD OK, RFID OK, ' + VA.t.length + ' tarjetas'); V.l1 = ''; vPantalla(p16(V.l1 || ' PUERTA SEGURA'), V.l2); }
+  else if (cmd === 'REINICIAR') { vEvento('Ajustes de fabrica: codigo 1234, sin tarjetas'); Object.assign(VA, {pin:'1234', tiempo:5, intentos:3, angulo:90, modoLuz:2, sonido:1, bloqueo:30, dist:40, merodeo:20, t:[]}); vGuardar(); V.estado = 0; V.fallos = 0; vLista(); }
+  else if (cmd === 'ESTADO') { vEvento('Puerta de seguridad lista. LCD OK, RFID OK, ultrasonico OK, ' + VA.t.length + ' tarjetas'); V.l1 = ''; vPantalla(p16(V.l1 || ' PUERTA SEGURA'), V.l2); }
   else if (cmd) { vEvento('Orden desconocida: ' + s); return; }
   vEstado();
 }
@@ -483,14 +506,45 @@ function vEstado(){
   const rest = V.estado === 1 && !V.mantener ? Math.floor((V.cerrarEn - t) / 1000) + 1 : 0;
   const bres = V.estado === 2 ? Math.floor((V.bloqueoHasta - t) / 1000) + 1 : 0;
   vEnviar(['ST', V.estado, +(V.meta > 0), rest, +V.verde, +V.rojo, +V.blanca, VA.modoLuz, V.fallos, VA.intentos, bres, VA.t.length,
-    VA.sonido, VA.tiempo, VA.bloqueo, VA.angulo, 1, 1, +V.registrando, +V.mantener].join(','));
+    VA.sonido, VA.tiempo, VA.bloqueo, VA.angulo, 1, 1, +V.registrando, +V.mantener, V.dist, +V.presencia, VA.dist, VA.merodeo, 1].join(','));
 }
 let tST = 0;
 function vLoop(){
   if (!V.vivo) return;
   const t = ms();
   if (V.registrando && t > V.regHasta) { V.registrando = false; V.msgHasta = 0; vEvento('Registro cancelado (no se acerco ninguna tarjeta)'); }
-  if (V.estado === 1 && !V.mantener && t >= V.cerrarEn) vCerrar('tiempo cumplido');
+  // ---- ultrasonico virtual ----
+  V.dist = V.persona >= 200 ? 999 : Math.max(2, Math.round(V.persona + (Math.random() - .5) * 2));
+  const cerca = V.dist <= VA.dist;
+  if (cerca) { V.lejosDesde = 0; if (!V.cercaDesde) V.cercaDesde = t; } else { V.cercaDesde = 0; if (!V.lejosDesde) V.lejosDesde = t; }
+  if (!V.presencia && V.cercaDesde && t - V.cercaDesde > 300) {
+    V.presencia = true; V.presDesde = t; V.merodeoAvisado = false; vLuz(10);
+    vEvento('Persona frente a la puerta (' + V.dist + ' cm)');
+    if (V.estado === 0 && !V.registrando && t > V.msgHasta) { vMensaje('   BIENVENIDO', 'Pase su tarjeta', 3000); vSonar(6); }
+    vEstado();
+  }
+  if (V.presencia && V.lejosDesde && t - V.lejosDesde > 1500) { V.presencia = false; vEvento('La persona se fue (estuvo ' + Math.floor((t - V.presDesde) / 1000) + ' s)'); vEstado(); }
+  if (V.presencia) {
+    vLuz(5);
+    if (VA.merodeo && !V.merodeoAvisado && V.estado !== 1 && t - V.presDesde > VA.merodeo * 1000) {
+      V.merodeoAvisado = true; vSonar(5); vMensaje('Persona sin', 'identificarse', 3000);
+      vEvento('AVISO: una persona lleva ' + VA.merodeo + ' s frente a la puerta sin entrar'); vEstado();
+    }
+  }
+  // en la simulacion, cuando la puerta se abre la persona entra sola
+  if (V.estado === 1 && V.persona < 200) {
+    if (!V.pasoDesde) V.pasoDesde = t;
+    const e = t - V.pasoDesde;
+    if (e > 1200 && V.persona > 8 && !V.pasando) { V.pasando = true; ponerPersona(8, true); }
+    if (e > 3500) { V.pasando = false; ponerPersona(200, true); vEvento('La persona entró'); }
+  } else { V.pasoDesde = 0; V.pasando = false; }
+  if (V.estado === 1 && !V.mantener && t >= V.cerrarEn) {
+    if (V.presencia && V.dist <= 15) {
+      V.cerrarEn = t + 2000;
+      if (t - V.tOcup > 5000) { V.tOcup = t; vEvento('No se cierra: hay alguien pasando por la puerta'); }
+      vMensaje('PUERTA OCUPADA', 'esperando...', 1500);
+    } else vCerrar('tiempo cumplido');
+  }
   if (V.estado === 2 && t >= V.bloqueoHasta) { V.estado = 0; V.fallos = 0; vEvento('Fin del bloqueo: se puede intentar de nuevo'); }
   if (V.estado !== 1) V.meta = 0;
   const parp = Math.floor(t / 250) % 2 === 1;
@@ -553,7 +607,7 @@ let hist = JSON.parse(localStorage.getItem(HKEY) || '[]');
 let filtro = 'todo';
 function claseDe(txt){
   if (/ABIERTA|registrada:|desbloqueada|silenciada|Codigo cambiado|quita el bloqueo/i.test(txt)) return 'ok';
-  if (/ALARMA|BLOQUEO:|BLOQUEADA a mano|Se perdio/i.test(txt)) return 'alr';
+  if (/ALARMA|BLOQUEO:|BLOQUEADA a mano|Se perdio|AVISO:/i.test(txt)) return 'alr';
   if (/denegad|desconocida|incorrecto|rechazada|ignorad|No se|desactivada|No caben|ya estaba/i.test(txt)) return 'mal';
   return '';
 }
@@ -604,6 +658,7 @@ function recibirLinea(l){
     const antes = S.estado;
     [S.estado, S.abierta, S.restante, S.verde, S.rojo, S.blanca, S.modoLuz, S.fallos, S.intentos, S.bloqRest, S.nTarj, S.sonido,
      S.tiempo, S.bloqueo, S.angulo, S.lcdOk, S.rfidOk, S.registrando, S.mantener] = n;
+    if (p.length >= 25) [S.dist, S.presencia, S.distDet, S.merodeo, S.ultraOk] = n.slice(19, 24);
     S.ultimoST = Date.now();
     if (S.modo === 'real' && S.estado === 4 && antes !== 4) toast('🚨 ALARMA en la puerta');
   }
@@ -746,6 +801,15 @@ $('billetera').onclick = e => {
   setTimeout(() => { vTarjeta(b.dataset.uid); vEstado(); }, 350);
 };
 
+/* ================= Persona frente al ultrasonico (simulacion) ================= */
+function ponerPersona(d, auto){
+  V.persona = d; $('uSlider').value = d;
+  if (!auto) anotar(d >= 200 ? 'Quité a la persona de la puerta' : 'Puse una persona a ' + d + ' cm de la puerta', 'yo');
+}
+$('uSlider').oninput = () => { V.persona = +$('uSlider').value; };
+$('uSlider').onchange = () => ponerPersona(+$('uSlider').value);
+$('uBts').onclick = e => { const b = e.target.closest('button'); if (b) { audio(); ponerPersona(+b.dataset.d); } };
+
 /* ================= Tarjetas guardadas ================= */
 function pintarTarjetas(){
   $('nT').textContent = '(' + S.lista.length + ' de 10)';
@@ -789,11 +853,11 @@ $('t-control').querySelectorAll('[data-c]').forEach(b => b.onclick = () => { aud
 $('segLuz').onclick = e => { const b = e.target.closest('button'); if (b) enviar('LUZ:' + b.dataset.v, 'Puse la luz blanca en ' + b.textContent.toLowerCase()); };
 $('segSon').onclick = e => { const b = e.target.closest('button'); if (b) enviar('SONIDO:' + b.dataset.v, b.dataset.v === '1' ? 'Activé el sonido' : 'Silencié el buzzer'); };
 document.querySelectorAll('[data-a]').forEach(b => b.onclick = () => {
-  const id = {TIEMPO:'aTiempo', INTENTOS:'aIntentos', BLOQUEO:'aBloqueo', ANGULO:'aAngulo'}[b.dataset.a];
+  const id = {TIEMPO:'aTiempo', INTENTOS:'aIntentos', BLOQUEO:'aBloqueo', ANGULO:'aAngulo', DIST:'aDist', MERODEO:'aMerodeo'}[b.dataset.a];
   const v = $(id).value; enviar(b.dataset.a + ':' + v, 'Cambié ' + $(id).closest('.campo').querySelector('label').textContent.toLowerCase() + ' a ' + v);
   $(id).dataset.tocado = '';
 });
-['aTiempo','aIntentos','aBloqueo','aAngulo'].forEach(id => $(id).oninput = () => $(id).dataset.tocado = '1');
+['aTiempo','aIntentos','aBloqueo','aAngulo','aDist','aMerodeo'].forEach(id => $(id).oninput = () => $(id).dataset.tocado = '1');
 $('bPin').onclick = () => {
   const v = $('pinV').value, n = $('pinN').value;
   if (!/^\d{4,6}$/.test(n)) { toast('El código nuevo debe tener de 4 a 6 números'); return; }
@@ -827,7 +891,16 @@ function pintar(){
   $('intChip').textContent = 'intentos fallidos ' + S.fallos + '/' + S.intentos;
   [...$('segLuz').children].forEach(b => b.classList.toggle('act', +b.dataset.v === S.modoLuz));
   [...$('segSon').children].forEach(b => b.classList.toggle('act', +b.dataset.v === S.sonido));
-  [['aTiempo', S.tiempo], ['aIntentos', S.intentos], ['aBloqueo', S.bloqueo], ['aAngulo', S.angulo]].forEach(([id, v]) => { if (document.activeElement !== $(id) && !$(id).dataset.tocado) $(id).value = v; });
+  [['aTiempo', S.tiempo], ['aIntentos', S.intentos], ['aBloqueo', S.bloqueo], ['aAngulo', S.angulo], ['aDist', S.distDet], ['aMerodeo', S.merodeo]].forEach(([id, v]) => { if (document.activeElement !== $(id) && !$(id).dataset.tocado) $(id).value = v; });
+  const hay = S.dist < 999;
+  $('uDist').textContent = hay ? S.dist + ' cm' : '— cm';
+  $('uTxt').innerHTML = !S.ultraOk ? '<span style="color:var(--rojo)">El sensor no da lecturas</span>' : S.presencia ? (S.dist <= 15 ? '<b style="color:var(--amb)">Alguien está pasando</b>' : '<b style="color:var(--azul)">Persona detectada</b>') : hay ? 'Algo lejos (detecta a ' + S.distDet + ' cm)' : 'Nadie frente a la puerta';
+  $('uBar').style.width = (hay ? Math.max(3, 100 - Math.min(200, S.dist) / 2) : 0) + '%';
+  $('uMarca').style.left = (100 - S.distDet / 2) + '%';
+  const per = $('persona'), dv = S.modo === 'sim' ? V.persona : (hay ? S.dist : 200);
+  per.style.opacity = dv < 200 ? 1 : 0;
+  per.style.fontSize = (40 + (200 - Math.min(200, dv)) * .7) + 'px';
+  $('uSlider').hidden = $('uBts').hidden = S.modo !== 'sim';
   const si = (b, a = 'Sí', n = 'No') => b ? `<span style="color:var(--verde)">${a}</span>` : `<span style="color:var(--rojo)">${n}</span>`;
   $('tablaEstado').innerHTML = `
     <tr><td>Puerta</td><td>${NOMBRE_EST[S.estado]}</td></tr>
@@ -835,6 +908,7 @@ function pintar(){
     <tr><td>Luces</td><td>blanca ${si(S.blanca,'prendida','apagada')} · verde ${si(S.verde,'prendida','apagada')} · roja ${si(S.rojo,'prendida','apagada')}</td></tr>
     <tr><td>Tarjetas guardadas</td><td>${S.nTarj} de 10</td></tr>
     <tr><td>Lector RFID</td><td>${si(S.rfidOk,'funciona','no se encuentra')}</td></tr>
+    <tr><td>Ultrasónico</td><td>${si(S.ultraOk,'funciona','sin lecturas')} · ${hay ? S.dist + ' cm' : 'nada al frente'}</td></tr>
     <tr><td>Pantalla LCD</td><td>${si(S.lcdOk,'funciona','no se encuentra')}</td></tr>
     <tr><td>Conexión</td><td>${S.modo === 'sim' ? 'simulación (sin Arduino)' : si(vivo,'responde','no responde')}</td></tr>`;
   const ban = S.estado === 4 ? '🚨 ALARMA DE PÁNICO — pulsa “Silenciar” o pasa una tarjeta de administrador'
