@@ -511,6 +511,13 @@ void loop() {
     if (ok != rfidOk) { rfidOk = ok; evento(ok ? "Lector RFID conectado" : "Se perdio el lector RFID"); cambio = true; }
   }
 
+  // si la pantalla no estaba al encender, se busca otra vez cada 5 s
+  static unsigned long tLcd = 0;
+  if (!lcd && ahora - tLcd > 5000) {
+    tLcd = ahora;
+    buscarLcd();
+    if (lcd) { evento("Pantalla LCD encontrada"); String a = l1, b = l2; l1 = ""; pantalla(a, b); cambio = true; }
+  }
   if (registrando && ahora > regHasta) { registrando = false; msgHasta = 0; evento("Registro cancelado (no se acerco ninguna tarjeta)"); cambio = true; }
   ultrasonico();
   if (estado == ABIERTA && !mantener && (long)(ahora - cerrarEn) >= 0) {
