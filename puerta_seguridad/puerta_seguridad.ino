@@ -13,7 +13,7 @@
   LED blanco  D6 -> 220 -> 220 -> LED(+) ; LED(-) -> GND
   LED verde   D5 -> 220 -> 220 -> LED(+) ; LED(-) -> GND
   LED rojo    D4 -> 220 -> 220 -> LED(+) ; LED(-) -> GND
-  Buzzer      (+)->D3  (-)->GND   (buzzer activo)
+  Buzzer      (+)->D2  (-)->GND   (pasivo: se le manda un tono de 2,7 kHz)
   HC-SR04     VCC->5V  TRIG->D7  ECHO->D8  GND->GND
 
   ORDENES (9600, por Bluetooth o USB, una por linea)
@@ -49,7 +49,7 @@
 
 #define BT Serial1
 
-const byte P_BUZ = 3, P_ROJO = 4, P_VERDE = 5, P_BLANCA = 6, P_TRIG = 7, P_ECHO = 8, P_SERVO = 9, P_SS = 10;
+const byte P_BUZ = 2, P_ROJO = 4, P_VERDE = 5, P_BLANCA = 6, P_TRIG = 7, P_ECHO = 8, P_SERVO = 9, P_SS = 10;
 const byte MAX_TARJ = 10;
 const byte FIRMA = 0xD2;
 
@@ -105,6 +105,13 @@ unsigned long presenciaDesde = 0, sinEco = 0;
 void enviar(const String &s) { Serial.println(s); BT.println(s); }
 void evento(const String &s) { enviar("EV," + s); }
 
+// ---------- buzzer: se manda un tono de 2,7 kHz, asi suena el activo y tambien el pasivo ----------
+bool buzOn = false;
+void buz(bool on) {
+  if (on == buzOn) return;
+  buzOn = on;
+  if (on) tone(P_BUZ, 2700); else { noTone(P_BUZ); digitalWrite(P_BUZ, LOW); }
+}
 // ---------- buzzer sin detener el programa ----------
 byte patron = 0; unsigned long patronIni = 0;   // 1 ok, 2 error, 3 sirena, 4 pitido, 5 registro, 6 tecla
 void sonar(byte p) { patron = p; patronIni = millis(); }
@@ -121,7 +128,7 @@ void buzzer() {
   }
   if (estado == ALARMA || (estado == BLOQ_INTENTOS && bloqueoHasta - millis() > (unsigned long)A.bloqueo * 1000UL - 10000UL)) on = (millis() % 500) < 300;
   if (!A.sonido && estado != ALARMA) on = false;
-  digitalWrite(P_BUZ, on);
+  buz(on);
 }
 
 // ---------- matriz del R4 ----------
@@ -306,7 +313,7 @@ void prueba() {
   evento("Prueba de luces, buzzer y servo");
   mensaje("PRUEBA", "luces y servo", 2500);
   for (byte p : {P_BLANCA, P_VERDE, P_ROJO}) { digitalWrite(p, HIGH); delay(300); digitalWrite(p, LOW); }
-  digitalWrite(P_BUZ, HIGH); delay(120); digitalWrite(P_BUZ, LOW);
+  buz(true); delay(150); buz(false);
   if (estado != ABIERTA) { anguloMeta = A.angulo; unsigned long t = millis(); while (millis() - t < 1200) moverServo(); anguloMeta = 0; }
 }
 
@@ -383,7 +390,7 @@ void orden(String s) {
   else if (cmd == "ANGULO") { A.angulo = constrain(n, 30, 180); guardar(); if (estado == ABIERTA) anguloMeta = A.angulo; evento("Angulo de apertura del servo: " + String(A.angulo) + " grados"); }
   else if (cmd == "LUZ") { A.modoLuz = constrain(n, 0, 2); guardar(); evento(String("Luz blanca: ") + (A.modoLuz == 0 ? "apagada" : A.modoLuz == 1 ? "prendida" : "automatica")); }
   else if (cmd == "SONIDO") { A.sonido = n ? 1 : 0; guardar(); evento(A.sonido ? "Sonido activado" : "Sonido silenciado (la alarma de panico si suena)"); }
-  else if (cmd == "PITAR") { bool s = A.sonido; A.sonido = 1; digitalWrite(P_BUZ, HIGH); delay(150); digitalWrite(P_BUZ, LOW); A.sonido = s; evento("Pitido de prueba"); }
+  else if (cmd == "PITAR") { bool s = A.sonido; A.sonido = 1; buz(true); delay(400); buz(false); A.sonido = s; evento("Pitido de prueba"); }
   else if (cmd == "DIST") { A.dist = constrain(n, 5, 200); guardar(); evento("Detecta personas a menos de " + String(A.dist) + " cm"); }
   else if (cmd == "MERODEO") { A.merodeo = constrain(n, 0, 250); guardar(); evento(A.merodeo ? "Aviso si alguien se queda " + String(A.merodeo) + " s frente a la puerta" : "Aviso de merodeo apagado"); }
   else if (cmd == "TECLA") { sonar(6); luzBlanca(10); }          // alguien esta escribiendo el codigo
@@ -473,8 +480,8 @@ void setup() {
   byte v = rfid.PCD_ReadRegister(MFRC522::VersionReg);
   rfidOk = !(v == 0x00 || v == 0xFF);
   servo.attach(P_SERVO); servo.write(0); delay(400); servo.detach();
-  digitalWrite(P_BLANCA, HIGH); digitalWrite(P_VERDE, HIGH); digitalWrite(P_ROJO, HIGH); digitalWrite(P_BUZ, HIGH);
-  delay(120); digitalWrite(P_BUZ, LOW); delay(600);
+  digitalWrite(P_BLANCA, HIGH); digitalWrite(P_VERDE, HIGH); digitalWrite(P_ROJO, HIGH); buz(true);
+  delay(150); buz(false); delay(600);
   digitalWrite(P_BLANCA, LOW); digitalWrite(P_VERDE, LOW); digitalWrite(P_ROJO, LOW);
   evento("Puerta de seguridad lista");
   evento(String("Sensor ultrasonico: ") + (medir() < 0 ? "sin eco (nada delante o desconectado)" : "listo"));
