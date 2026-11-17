@@ -477,6 +477,7 @@ void setup() {
   pantalla(" PUERTA SEGURA", "  iniciando...");
   SPI.begin();
   rfid.PCD_Init();
+  rfid.PCD_SetAntennaGain(rfid.RxGain_max);
   byte v = rfid.PCD_ReadRegister(MFRC522::VersionReg);
   rfidOk = !(v == 0x00 || v == 0xFF);
   servo.attach(P_SERVO); servo.write(0); delay(400); servo.detach();
@@ -496,10 +497,15 @@ void loop() {
   leer(Serial, linUsb);
   leer(BT, linBt);
 
-  if (rfid.PICC_IsNewCardPresent() && rfid.PICC_ReadCardSerial()) {
-    tarjetaLeida(rfid.uid.uidByte, rfid.uid.size);
-    rfid.PICC_HaltA();
-    rfid.PCD_StopCrypto1();
+  if (rfid.PICC_IsNewCardPresent()) {
+    if (rfid.PICC_ReadCardSerial()) {
+      tarjetaLeida(rfid.uid.uidByte, rfid.uid.size);
+      rfid.PICC_HaltA();
+      rfid.PCD_StopCrypto1();
+    } else {
+      static unsigned long tMal = 0;
+      if (ahora - tMal > 3000) { tMal = ahora; evento("Se detecto una tarjeta pero no se pudo leer: dejala quieta y pegada al lector"); }
+    }
   }
   // el lector a veces se cuelga: se reinicia cada 10 s si no responde
   static unsigned long tRfid = 0;
@@ -507,7 +513,8 @@ void loop() {
     tRfid = ahora;
     byte v = rfid.PCD_ReadRegister(MFRC522::VersionReg);
     bool ok = !(v == 0x00 || v == 0xFF);
-    if (!ok) rfid.PCD_Init();
+    if (!ok) { rfid.PCD_Init(); rfid.PCD_SetAntennaGain(rfid.RxGain_max); }
+    else if (rfid.PCD_GetAntennaGain() != rfid.RxGain_max) { rfid.PCD_Init(); rfid.PCD_SetAntennaGain(rfid.RxGain_max); evento("Lector RFID reiniciado"); }
     if (ok != rfidOk) { rfidOk = ok; evento(ok ? "Lector RFID conectado" : "Se perdio el lector RFID"); cambio = true; }
   }
 
