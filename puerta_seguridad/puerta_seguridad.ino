@@ -13,7 +13,7 @@
   LED blanco  D6 -> 220 -> 220 -> LED(+) ; LED(-) -> GND
   LED verde   D5 -> 220 -> 220 -> LED(+) ; LED(-) -> GND
   LED rojo    D4 -> 220 -> 220 -> LED(+) ; LED(-) -> GND
-  Buzzer      (+)->D2  (-)->GND   (pasivo: el sonido se genera a mano, sin tone())
+  Buzzer      (+)->D2 o D3  (-)->GND   (pasivo: el sonido se genera a mano, sin tone())
   HC-SR04     VCC->5V  TRIG->D7  ECHO->D8  GND->GND
 
   ORDENES (9600, por Bluetooth o USB, una por linea)
@@ -49,6 +49,7 @@
 
 #define BT Serial1
 
+const byte P_BUZ2 = 3;   // el sonido sale por D2 y D3: el buzzer puede ir en cualquiera de los dos
 const byte P_BUZ = 2, P_ROJO = 4, P_VERDE = 5, P_BLANCA = 6, P_TRIG = 7, P_ECHO = 8, P_SERVO = 9, P_SS = 10;
 const byte MAX_TARJ = 10;
 const byte FIRMA = 0xD2;
@@ -111,11 +112,11 @@ void evento(const String &s) { enviar("EV," + s); }
 void onda(unsigned int ms, unsigned int frec = 2000) {
   unsigned long medio = 500000UL / frec, fin = millis() + ms;
   while ((long)(millis() - fin) < 0) {
-    digitalWrite(P_BUZ, HIGH); delayMicroseconds(medio);
-    digitalWrite(P_BUZ, LOW);  delayMicroseconds(medio);
+    digitalWrite(P_BUZ, HIGH); digitalWrite(P_BUZ2, HIGH); delayMicroseconds(medio);
+    digitalWrite(P_BUZ, LOW);  digitalWrite(P_BUZ2, LOW);  delayMicroseconds(medio);
   }
 }
-void silencio(unsigned int ms) { digitalWrite(P_BUZ, LOW); delay(ms); }
+void silencio(unsigned int ms) { digitalWrite(P_BUZ, LOW); digitalWrite(P_BUZ2, LOW); delay(ms); }
 // 1 acceso, 2 error, 4 cierre, 5 registro, 6 tecla, 7 abre (puerta se activa)
 void sonar(byte p) {
   if (!A.sonido) return;
@@ -130,7 +131,7 @@ void sonar(byte p) {
 // sirena de alarma y de bloqueo (sube y baja de tono)
 void buzzer() {
   bool sirena = estado == ALARMA || (estado == BLOQ_INTENTOS && bloqueoHasta - millis() > (unsigned long)A.bloqueo * 1000UL - 10000UL);
-  if (!sirena || (!A.sonido && estado != ALARMA)) { digitalWrite(P_BUZ, LOW); return; }
+  if (!sirena || (!A.sonido && estado != ALARMA)) { digitalWrite(P_BUZ, LOW); digitalWrite(P_BUZ2, LOW); return; }
   static unsigned long t = 0; static bool alto = false;
   if (millis() - t >= 450) { t = millis(); alto = !alto; onda(250, alto ? 2600 : 1800); }
 }
@@ -471,7 +472,7 @@ void ultrasonico() {
 void setup() {
   Serial.begin(9600);
   BT.begin(9600);
-  pinMode(P_BUZ, OUTPUT); pinMode(P_ROJO, OUTPUT); pinMode(P_VERDE, OUTPUT); pinMode(P_BLANCA, OUTPUT);
+  pinMode(P_BUZ, OUTPUT); pinMode(P_BUZ2, OUTPUT); pinMode(P_ROJO, OUTPUT); pinMode(P_VERDE, OUTPUT); pinMode(P_BLANCA, OUTPUT);
   pinMode(P_TRIG, OUTPUT); pinMode(P_ECHO, INPUT); digitalWrite(P_TRIG, LOW);
   cargar();
   matriz.begin();
