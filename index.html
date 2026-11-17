@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#14161a">
+<title>Puerta de Seguridad · Simulador y control</title>
+<style>
+:root{
+  --bg:#101215; --panel:#191c21; --panel2:#20242a; --line:#2d323a; --txt:#e8e6e1; --mute:#8d939c;
+  --amb:#f2a93b; --verde:#38d27a; --rojo:#ff4d4d; --blanco:#fffbe8; --azul:#5aa9ff;
+  --r:14px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--txt);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-tap-highlight-color:transparent}
+button{font:inherit;color:inherit;cursor:pointer;border:1px solid var(--line);background:var(--panel2);border-radius:10px;padding:9px 12px;touch-action:manipulation;transition:background .15s,border-color .15s,transform .08s}
+button:hover{border-color:#4a515c}
+button:active{transform:scale(.97)}
+button:disabled{opacity:.4;cursor:default;transform:none}
+button.pri{background:var(--amb);color:#1b1305;border-color:var(--amb);font-weight:650}
+button.ok{border-color:#2a7a4c;background:#16301f;color:#bff3d3}
+button.mal{border-color:#7a2a2a;background:#331616;color:#ffd0d0}
+input,select{font:inherit;color:var(--txt);background:#121418;border:1px solid var(--line);border-radius:9px;padding:8px 10px;width:100%;font-size:16px}
+label{color:var(--mute);font-size:13px}
+h2{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);margin:0 0 10px;font-weight:600}
+
+header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 18px;border-bottom:1px solid var(--line);background:#14161a;position:sticky;top:0;z-index:5}
+.logo{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:.02em}
+.logo svg{width:28px;height:28px}
+.logo small{display:block;font-weight:400;color:var(--mute);font-size:12px;letter-spacing:0}
+.con{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.pill{font-size:12px;padding:5px 10px;border-radius:99px;border:1px solid var(--line);color:var(--mute);white-space:nowrap}
+.pill.real{color:#bff3d3;border-color:#2a7a4c;background:#16301f}
+.pill.caido{color:#ffd0d0;border-color:#7a2a2a;background:#331616}
+
+main{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:16px;padding:16px;max-width:1300px;margin:0 auto}
+@media (max-width:900px){main{grid-template-columns:1fr;padding:10px;gap:12px}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:14px}
+
+/* ---------- escena de la puerta ---------- */
+.escena{display:grid;grid-template-columns:1fr 150px;gap:14px;align-items:stretch}
+@media (max-width:520px){.escena{grid-template-columns:1fr 112px;gap:10px}}
+.marco{position:relative;aspect-ratio:3/4;max-height:440px;margin:auto;width:100%;background:#0b0c0e;border:10px solid #3a3f47;border-bottom-width:0;border-radius:8px 8px 0 0;perspective:900px;overflow:hidden}
+.marco::after{content:"";position:absolute;left:0;right:0;bottom:0;height:8px;background:#2a2e34}
+.otro-lado{position:absolute;inset:0;background:linear-gradient(#2b3a2f,#1b241e);display:flex;align-items:center;justify-content:center;color:#7fae8a;font-size:13px;text-align:center}
+.hoja{position:absolute;inset:0;transform-origin:left center;transition:transform 1.1s cubic-bezier(.3,.7,.2,1);background:
+  linear-gradient(90deg,#5b4632,#6d543b 40%,#5e4834);box-shadow:inset 0 0 0 2px #00000040}
+.hoja .panel{position:absolute;left:12%;right:12%;border:3px solid #00000030;border-radius:4px;box-shadow:inset 0 0 0 2px #ffffff10}
+.hoja .p1{top:7%;height:38%}.hoja .p2{top:52%;height:38%}
+.hoja .manija{position:absolute;right:9%;top:50%;width:9%;height:2.2%;background:#c9c9c9;border-radius:6px;box-shadow:0 1px 2px #000}
+.abierta .hoja{transform:rotateY(-72deg)}
+.cerrojo{position:absolute;right:-2px;top:44%;width:16%;height:9%;background:#2a2e34;border-radius:6px 0 0 6px;display:flex;align-items:center;justify-content:center;z-index:2}
+.cerrojo svg{width:80%;height:80%}
+#brazo{transition:transform .5s ease;transform-origin:20px 20px}
+.marco .letrero{position:absolute;left:0;right:0;top:10px;text-align:center;font-size:12px;color:#f3e7d4cc;z-index:1;pointer-events:none}
+
+.lado{display:flex;flex-direction:column;gap:12px}
+.lector{background:#22262c;border:1px solid var(--line);border-radius:14px;padding:12px 10px;display:flex;flex-direction:column;align-items:center;gap:10px}
+.leds{display:flex;gap:12px}
+.led{width:20px;height:20px;border-radius:50%;background:#2a2d33;border:2px solid #3b4048;position:relative}
+.led::after{content:attr(data-n);position:absolute;top:24px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--mute)}
+.led.on.b{background:var(--blanco);box-shadow:0 0 14px 4px #fffbe8a0;border-color:#fff}
+.led.on.v{background:var(--verde);box-shadow:0 0 14px 4px #38d27a90;border-color:#9ff0c2}
+.led.on.r{background:var(--rojo);box-shadow:0 0 14px 4px #ff4d4d90;border-color:#ffb1b1}
+.zona-rfid{margin-top:12px;width:100%;aspect-ratio:1;border-radius:12px;border:2px dashed #46505c;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:var(--mute);font-size:11px;text-align:center;transition:border-color .2s,background .2s}
+.zona-rfid svg{width:42%;opacity:.8}
+.zona-rfid.leyendo{border-color:var(--azul);background:#5aa9ff18}
+.zona-rfid.si{border-color:var(--verde);background:#38d27a18}
+.zona-rfid.no{border-color:var(--rojo);background:#ff4d4d18}
+.buz{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mute)}
+.buz i{width:12px;height:12px;border-radius:50%;background:#2a2d33;border:2px solid #3b4048}
+.buz.on i{background:var(--amb);box-shadow:0 0 10px 3px #f2a93b90}
+
+.lcd{margin-top:14px;background:#0e1a0b;border:6px solid #23272d;border-radius:8px;padding:8px 10px;font:600 clamp(14px,3.6vw,21px)/1.25 ui-monospace,"Cascadia Mono",Consolas,monospace;color:#9dff8a;white-space:pre;letter-spacing:.06em;text-shadow:0 0 6px #6dff4a70;overflow:hidden}
+.lcd.apagada{color:#2c4a26;text-shadow:none}
+.estado-grande{margin-top:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.estado-grande b{font-size:20px}
+.chip{font-size:12px;padding:3px 9px;border-radius:99px;background:var(--panel2);border:1px solid var(--line);color:var(--mute)}
+
+/* ---------- teclado ---------- */
+.tecl-wrap{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px}
+@media (max-width:520px){.tecl-wrap{grid-template-columns:1fr}}
+.pantallita{height:46px;border-radius:10px;background:#0c0d10;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;gap:10px;font-size:22px;letter-spacing:.3em;margin-bottom:10px}
+.pantallita.mal{animation:sacudir .35s;border-color:var(--rojo)}
+.pantallita.bien{border-color:var(--verde)}
+@keyframes sacudir{25%{transform:translateX(-6px)}50%{transform:translateX(6px)}75%{transform:translateX(-3px)}}
+.teclado{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.teclado button{height:52px;font-size:20px;font-weight:600;border-radius:12px;background:#24282f}
+.teclado .k-ok{background:var(--verde);color:#062814;border-color:var(--verde)}
+.teclado .k-bor{font-size:15px}
+.billetera{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.tarjeta-v{position:relative;aspect-ratio:1.586;border-radius:10px;padding:8px 10px;text-align:left;display:flex;flex-direction:column;justify-content:space-between;border:none;color:#fff;overflow:hidden;font-size:12px;box-shadow:0 2px 6px #0006}
+.tarjeta-v b{font-size:13px;padding-right:62px;line-height:1.2}
+.tarjeta-v small{opacity:.8;font-family:ui-monospace,Consolas,monospace;font-size:10px}
+.tarjeta-v .etq{position:absolute;right:6px;top:6px;font-size:10px;padding:1px 6px;border-radius:99px;background:#0006}
+.tarjeta-v.volando{animation:pasar .7s ease}
+@keyframes pasar{40%{transform:translateY(-8px) scale(1.04)}}
+.nota{font-size:13px;color:var(--mute)}
+
+/* ---------- pestañas ---------- */
+.tabs{display:flex;gap:4px;overflow-x:auto;margin:-4px -4px 12px;padding:4px;scrollbar-width:none}
+.tabs button{border:none;background:none;color:var(--mute);padding:8px 12px;border-radius:9px;white-space:nowrap}
+.tabs button.act{background:var(--panel2);color:var(--txt);box-shadow:inset 0 0 0 1px var(--line)}
+.tab[hidden]{display:none}
+.grid-b{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}
+.grid-b button{padding:12px 10px;text-align:left;display:flex;flex-direction:column;gap:2px}
+.grid-b button small{color:var(--mute);font-size:11px}
+.fila{display:flex;gap:8px;align-items:center}
+.fila>*{flex:1}
+.campo{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
+.ajustes{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px}
+@media (max-width:420px){.ajustes{grid-template-columns:1fr}}
+.seg{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{flex:1;border:none;border-radius:0;background:#121418;padding:8px 4px;font-size:13px}
+.seg button.act{background:var(--amb);color:#1b1305;font-weight:650}
+.lista-t{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.lt{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:#16191d}
+.lt .nom{font-weight:600}
+.lt small{color:var(--mute);font-family:ui-monospace,Consolas,monospace}
+.lt .acc{display:flex;gap:4px}
+.lt .acc button{padding:5px 8px;font-size:12px}
+.lt.off{opacity:.55}
+.sep{height:1px;background:var(--line);margin:14px 0}
+
+/* ---------- historial ---------- */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px}
+.stats div{background:#16191d;border:1px solid var(--line);border-radius:10px;padding:8px;text-align:center}
+.stats b{display:block;font-size:20px}
+.stats span{font-size:11px;color:var(--mute)}
+.hist{max-height:420px;overflow:auto;display:flex;flex-direction:column;gap:2px;font-size:13.5px}
+.h{display:grid;grid-template-columns:64px 18px 1fr;gap:6px;padding:5px 6px;border-radius:7px}
+.h:nth-child(odd){background:#16191d}
+.h time{color:var(--mute);font-variant-numeric:tabular-nums;font-size:12px;padding-top:1px}
+.h.ok{color:#bff3d3}.h.mal{color:#ffc4c4}.h.alr{color:#ffd28a;font-weight:600}.h.yo{color:#bcd9ff}
+.filtros{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.filtros button{padding:4px 10px;font-size:12px;border-radius:99px}
+.filtros button.act{border-color:var(--amb);color:var(--amb)}
+.monitor{font:12px/1.4 ui-monospace,Consolas,monospace;background:#0b0c0e;border:1px solid var(--line);border-radius:10px;padding:8px;height:220px;overflow:auto;white-space:pre-wrap;word-break:break-all}
+.monitor .tx{color:#ffcf7a}.monitor .rx{color:#9fb3c8}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+td,th{border-bottom:1px solid var(--line);padding:7px 6px;text-align:left;vertical-align:top}
+th{color:var(--mute);font-weight:600;font-size:12px}
+td code{font-family:ui-monospace,Consolas,monospace;color:var(--amb)}
+
+.banner{display:none;margin:0 16px;padding:12px 16px;border-radius:12px;background:#3a1414;border:1px solid #a33;color:#ffd7d7;font-weight:600;text-align:center}
+.banner.ver{display:block;animation:latir 1s infinite}
+@keyframes latir{50%{background:#5a1818}}
+.toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%) translateY(120px);background:#262a31;border:1px solid var(--line);padding:10px 16px;border-radius:12px;transition:transform .3s;z-index:9;max-width:92vw;text-align:center}
+.toast.ver{transform:translateX(-50%) translateY(0)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">
+    <svg viewBox="0 0 32 32" fill="none"><rect x="5" y="13" width="22" height="16" rx="3" fill="#f2a93b"/><path d="M10 13V9a6 6 0 0 1 12 0v4" stroke="#f2a93b" stroke-width="3"/><circle cx="16" cy="20" r="2.4" fill="#1b1305"/><rect x="15" y="21" width="2" height="4" fill="#1b1305"/></svg>
+    <div>Puerta de Seguridad<small>RFID · código · Bluetooth HC-05 · UNO R4 WiFi</small></div>
+  </div>
+  <div class="con">
+    <span id="modo" class="pill">Simulación</span>
+    <button id="bBt" class="pri">Conectar Bluetooth</button>
+    <button id="bUsb">USB</button>
+    <button id="bDesc" disabled>Desconectar</button>
+  </div>
+</header>
+<div id="banner" class="banner"></div>
+
+<main>
+  <!-- ======= izquierda: la puerta ======= -->
+  <section style="display:flex;flex-direction:column;gap:16px;min-width:0">
+    <div class="card">
+      <div class="escena">
+        <div id="marco" class="marco">
+          <div class="otro-lado">Zona segura<br>🔒</div>
+          <div class="hoja"><div class="panel p1"></div><div class="panel p2"></div><div class="manija"></div><div class="letrero">ACCESO RESTRINGIDO</div></div>
+          <div class="cerrojo" title="Servomotor (cerrojo)">
+            <svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="7" fill="#555c66"/><g id="brazo"><rect x="17" y="3" width="6" height="19" rx="3" fill="#e9e9e9"/></g><circle cx="20" cy="20" r="3" fill="#222"/></svg>
+          </div>
+        </div>
+        <div class="lado">
+          <div class="lector">
+            <div class="leds"><div id="ledB" class="led b" data-n="blanca"></div><div id="ledV" class="led v" data-n="verde"></div><div id="ledR" class="led r" data-n="roja"></div></div>
+            <div id="zona" class="zona-rfid">
+              <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M14 14a14 14 0 0 1 0 20M21 9a21 21 0 0 1 0 30M28 4a28 28 0 0 1 0 40"/></svg>
+              <span id="zonaTxt">Lector RFID</span>
+            </div>
+            <div id="buz" class="buz"><i></i>Buzzer</div>
+          </div>
+          <div class="nota" id="servoTxt" style="text-align:center">Servo: 0°</div>
+        </div>
+      </div>
+      <div id="lcd" class="lcd"> PUERTA SEGURA
+Tarjeta o codigo</div>
+      <div class="estado-grande"><b id="estTxt">CERRADA</b><span id="estChip" class="chip"></span><span id="intChip" class="chip"></span></div>
+    </div>
+
+    <div class="card">
+      <div class="tecl-wrap">
+        <div>
+          <h2>Entrar con código</h2>
+          <div id="pantallita" class="pantallita"><span style="color:var(--mute);font-size:14px;letter-spacing:0">Escribe el código</span></div>
+          <div class="teclado" id="teclado"></div>
+        </div>
+        <div>
+          <h2>Pasar una tarjeta</h2>
+          <div id="billetera" class="billetera"></div>
+          <p class="nota" id="billNota" style="margin:10px 0 0">Toca una tarjeta para acercarla al lector.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======= derecha: control ======= -->
+  <section class="card" style="min-width:0">
+    <div class="tabs" id="tabs">
+      <button data-t="control" class="act">Control</button>
+      <button data-t="tarjetas">Tarjetas</button>
+      <button data-t="ajustes">Ajustes</button>
+      <button data-t="historial">Historial</button>
+      <button data-t="monitor">Monitor</button>
+      <button data-t="conexiones">Conexiones</button>
+    </div>
+
+    <div class="tab" id="t-control">
+      <h2>Puerta</h2>
+      <div class="grid-b">
+        <button class="ok" data-c="ABRIR">Abrir<small>se cierra sola</small></button>
+        <button class="ok" data-c="ABRIR:0">Dejar abierta<small>hasta que la cierres</small></button>
+        <button data-c="CERRAR">Cerrar<small>ahora mismo</small></button>
+        <button data-c="BLOQUEAR">Bloquear<small>solo administrador</small></button>
+        <button data-c="DESBLOQUEAR">Desbloquear<small>quita el bloqueo</small></button>
+        <button class="mal" data-c="PANICO">Pánico<small>sirena y luces</small></button>
+        <button data-c="SILENCIAR">Silenciar<small>apaga la alarma</small></button>
+        <button data-c="PRUEBA">Probar todo<small>luces, buzzer, servo</small></button>
+        <button data-c="PITAR">Pitar<small>prueba del buzzer</small></button>
+      </div>
+      <div class="sep"></div>
+      <h2>Luz blanca</h2>
+      <div class="seg" id="segLuz"><button data-v="0">Apagada</button><button data-v="1">Prendida</button><button data-v="2">Automática</button></div>
+      <p class="nota" style="margin:6px 0 0">En automática se prende cuando alguien pasa una tarjeta, escribe el código o la puerta se abre.</p>
+      <div class="sep"></div>
+      <h2>Sonido del buzzer</h2>
+      <div class="seg" id="segSon"><button data-v="1">Activado</button><button data-v="0">Silencio</button></div>
+      <div class="sep"></div>
+      <h2>Estado del equipo</h2>
+      <table id="tablaEstado"></table>
+    </div>
+
+    <div class="tab" id="t-tarjetas" hidden>
+      <h2>Registrar una tarjeta nueva</h2>
+      <div class="campo"><label for="regNom">Nombre (máx. 10 letras)</label><input id="regNom" maxlength="10" placeholder="Ej.: Profesor"></div>
+      <div class="fila" style="margin-bottom:6px">
+        <label style="display:flex;gap:8px;align-items:center;color:var(--txt);flex:0 0 auto"><input type="checkbox" id="regAdm" style="width:18px;height:18px"> Administrador</label>
+        <button class="pri" id="bReg">Registrar</button>
+        <button id="bCan">Cancelar</button>
+      </div>
+      <p class="nota" id="regNota" style="margin:4px 0 0">Después de pulsar Registrar tienes 15 s para acercar la tarjeta al lector. El administrador puede abrir aunque la puerta esté bloqueada.</p>
+      <div class="sep"></div>
+      <div class="fila"><h2 style="margin:0">Tarjetas guardadas <span id="nT"></span></h2><button id="bBorrarTodo" class="mal" style="flex:0 0 auto;padding:5px 10px;font-size:12px">Borrar todas</button></div>
+      <div id="listaT" class="lista-t"></div>
+    </div>
+
+    <div class="tab" id="t-ajustes" hidden>
+      <h2>Tiempos</h2>
+      <div class="ajustes">
+        <div class="campo"><label for="aTiempo">Segundos abierta</label><div class="fila"><input type="number" id="aTiempo" min="2" max="60"><button data-a="TIEMPO" style="flex:0 0 auto">Guardar</button></div></div>
+        <div class="campo"><label for="aIntentos">Intentos antes del bloqueo</label><div class="fila"><input type="number" id="aIntentos" min="2" max="9"><button data-a="INTENTOS" style="flex:0 0 auto">Guardar</button></div></div>
+        <div class="campo"><label for="aBloqueo">Segundos de bloqueo</label><div class="fila"><input type="number" id="aBloqueo" min="10" max="600"><button data-a="BLOQUEO" style="flex:0 0 auto">Guardar</button></div></div>
+        <div class="campo"><label for="aAngulo">Ángulo del servo al abrir</label><div class="fila"><input type="number" id="aAngulo" min="30" max="180"><button data-a="ANGULO" style="flex:0 0 auto">Guardar</button></div></div>
+      </div>
+      <div class="sep"></div>
+      <h2>Cambiar el código</h2>
+      <div class="ajustes">
+        <div class="campo"><label for="pinV">Código actual</label><input id="pinV" type="password" inputmode="numeric" maxlength="6"></div>
+        <div class="campo"><label for="pinN">Código nuevo (4 a 6 números)</label><input id="pinN" type="password" inputmode="numeric" maxlength="6"></div>
+      </div>
+      <button id="bPin" class="pri">Cambiar código</button>
+      <p class="nota" id="pinNota">El código de fábrica es <b>1234</b>.</p>
+      <div class="sep"></div>
+      <h2>Orden directa</h2>
+      <div class="fila"><input id="ordenTxt" placeholder="Ej.: ESTADO, LUZ:1, TIEMPO:8"><button id="bOrden" style="flex:0 0 auto">Enviar</button></div>
+      <div class="sep"></div>
+      <button id="bFab" class="mal">Volver a fábrica (código 1234, sin tarjetas)</button>
+    </div>
+
+    <div class="tab" id="t-historial" hidden>
+      <div class="stats">
+        <div><b id="sOk">0</b><span>entradas</span></div>
+        <div><b id="sNo">0</b><span>negados</span></div>
+        <div><b id="sBl">0</b><span>bloqueos</span></div>
+        <div><b id="sAl">0</b><span>alarmas</span></div>
+      </div>
+      <div class="filtros" id="filtros">
+        <button data-f="todo" class="act">Todo</button><button data-f="ok">Entradas</button><button data-f="mal">Negados</button><button data-f="alr">Alarmas</button><button data-f="yo">Lo que hice</button>
+      </div>
+      <div id="hist" class="hist"></div>
+      <div class="fila" style="margin-top:10px"><button id="bExport">Descargar historial</button><button id="bLimpiar">Borrar historial</button></div>
+    </div>
+
+    <div class="tab" id="t-monitor" hidden>
+      <h2>Lo que va y viene</h2>
+      <p class="nota" style="margin:-4px 0 8px"><span style="color:#ffcf7a">→ lo que envía el simulador</span> · <span style="color:#9fb3c8">← lo que responde el Arduino</span></p>
+      <div id="monitor" class="monitor"></div>
+      <label style="display:flex;gap:8px;align-items:center;margin-top:8px"><input type="checkbox" id="verST" style="width:16px;height:16px"> Mostrar también el estado de cada segundo (ST)</label>
+    </div>
+
+    <div class="tab" id="t-conexiones" hidden>
+      <h2>Conexiones al Arduino UNO R4 WiFi</h2>
+      <table>
+        <tr><th>Pieza</th><th>Pata</th><th>Va a</th></tr>
+        <tr><td rowspan="4">Bluetooth HC-05</td><td>VCC</td><td><code>5V</code></td></tr>
+        <tr><td>GND</td><td><code>GND</code></td></tr>
+        <tr><td>TXD</td><td><code>D0</code></td></tr>
+        <tr><td>RXD</td><td><code>D1</code> con divisor: D1 → 220 Ω → RXD → 220 Ω → 220 Ω → GND</td></tr>
+        <tr><td rowspan="7">Lector RFID RC522</td><td>3.3V</td><td><code>3.3V</code> (¡no a 5V!)</td></tr>
+        <tr><td>RST</td><td><code>3.3V</code></td></tr>
+        <tr><td>GND</td><td><code>GND</code></td></tr>
+        <tr><td>SDA</td><td><code>D10</code></td></tr>
+        <tr><td>SCK</td><td><code>D13</code></td></tr>
+        <tr><td>MOSI</td><td><code>D11</code></td></tr>
+        <tr><td>MISO</td><td><code>D12</code> (IRQ no se usa)</td></tr>
+        <tr><td rowspan="2">Pantalla LCD 16×2 I2C</td><td>VCC / GND</td><td><code>5V</code> / <code>GND</code></td></tr>
+        <tr><td>SDA / SCL</td><td><code>SDA</code> / <code>SCL</code> (junto al AREF)</td></tr>
+        <tr><td>Servomotor SG90</td><td>café / rojo / naranja</td><td><code>GND</code> / <code>5V</code> / <code>D9</code></td></tr>
+        <tr><td>LED blanco</td><td>pata larga (+)</td><td><code>D6</code> → 220 Ω → 220 Ω → LED; pata corta → GND</td></tr>
+        <tr><td>LED verde</td><td>pata larga (+)</td><td><code>D5</code> → 220 Ω → 220 Ω → LED; pata corta → GND</td></tr>
+        <tr><td>LED rojo</td><td>pata larga (+)</td><td><code>D4</code> → 220 Ω → 220 Ω → LED; pata corta → GND</td></tr>
+        <tr><td>Buzzer activo</td><td>+ / −</td><td><code>D3</code> / <code>GND</code></td></tr>
+      </table>
+      <p class="nota">La matriz de luces del R4 muestra un candado cerrado, abierto o una ✕. Para conectar por Bluetooth, empareja primero el HC-05 en el celular o la PC (clave <b>1234</b> o <b>0000</b>) y usa Chrome o Edge. En iPhone no funciona.</p>
+      <h2 style="margin-top:14px">Materiales</h2>
+      <table>
+        <tr><td>Arduino UNO R4 WiFi</td><td>1</td></tr><tr><td>Lector RFID RC522 + tarjeta y llavero</td><td>1</td></tr>
+        <tr><td>Módulo Bluetooth HC-05</td><td>1</td></tr><tr><td>Pantalla LCD 16×2 con módulo I2C</td><td>1</td></tr>
+        <tr><td>Servomotor SG90</td><td>1</td></tr><tr><td>LED blanco, LED verde, LED rojo</td><td>1 de cada uno</td></tr>
+        <tr><td>Buzzer activo</td><td>1</td></tr><tr><td>Resistencias de 220 Ω</td><td>9 (6 de los LEDs + 3 del divisor)</td></tr>
+        <tr><td>Protoboard</td><td>1</td></tr><tr><td>Cables macho–hembra</td><td>15 (RC522 7, HC-05 4, LCD 4)</td></tr>
+        <tr><td>Cables macho–macho</td><td>unos 20</td></tr>
+      </table>
+    </div>
+  </section>
+</main>
+<div id="toast" class="toast"></div>
+
+<script>
+(() => {
+'use strict';
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const hora = () => new Date().toLocaleTimeString('es', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+
+/* ================= Estado que muestra la página (llega por ST/LC/TL) ================= */
+const S = {
+  modo:'sim', estado:0, abierta:0, restante:0, verde:0, rojo:0, blanca:0, modoLuz:2, fallos:0, intentos:3,
+  bloqRest:0, nTarj:0, sonido:1, tiempo:5, bloqueo:30, angulo:90, lcdOk:1, rfidOk:1, registrando:0, mantener:0,
+  l1:' PUERTA SEGURA', l2:'Tarjeta o codigo', lista:[], ultimoST:Date.now(), buzzer:false
+};
+const NOMBRE_EST = ['CERRADA','ABIERTA','BLOQUEADA (intentos)','BLOQUEADA','ALARMA'];
+
+/* ================= Arduino virtual (mismas reglas que el .ino) ================= */
+const GUARDADO = 'puerta-seguridad-va-v1';
+const VA = Object.assign({
+  pin:'1234', tiempo:5, intentos:3, angulo:90, modoLuz:2, sonido:1, bloqueo:30,
+  t:[{uid:'A3F1220C', admin:1, activa:1, nombre:'Edwin'}, {uid:'5B7C9E11', admin:0, activa:1, nombre:'Visitante'}]
+}, JSON.parse(localStorage.getItem(GUARDADO) || '{}'));
+const V = { estado:0, mantener:false, cerrarEn:0, bloqueoHasta:0, blancaHasta:0, regHasta:0, fallos:0,
+  registrando:false, regAdmin:false, regNombre:'', msgHasta:0, l1:'', l2:'', meta:0, ang:0, patron:0, patronIni:0, vivo:true };
+const vGuardar = () => localStorage.setItem(GUARDADO, JSON.stringify({pin:VA.pin, tiempo:VA.tiempo, intentos:VA.intentos, angulo:VA.angulo, modoLuz:VA.modoLuz, sonido:VA.sonido, bloqueo:VA.bloqueo, t:VA.t}));
+const ms = () => Date.now();
+const vEnviar = s => setTimeout(() => recibirLinea(s), 30);
+const vEvento = s => vEnviar('EV,' + s);
+const p16 = s => (s + ' '.repeat(16)).slice(0, 16);
+function vPantalla(a, b){ a = p16(a); b = p16(b); if (a === V.l1 && b === V.l2) return; V.l1 = a; V.l2 = b; vEnviar('LC,' + a + ',' + b); }
+function vMensaje(a, b, t){ V.msgHasta = ms() + t; vPantalla(a, b); }
+function vSonar(p){ V.patron = p; V.patronIni = ms(); sonidoPatron(p); }
+const vLuz = s => V.blancaHasta = ms() + s * 1000;
+function vAbrir(quien, fijo){
+  V.estado = 1; V.mantener = fijo; V.fallos = 0; V.cerrarEn = ms() + VA.tiempo * 1000; V.meta = VA.angulo;
+  vLuz(VA.tiempo + 5); vSonar(1); vMensaje('ACCESO PERMITIDO', quien, 2000);
+  vEvento('Puerta ABIERTA: ' + quien + (fijo ? ' (se queda abierta)' : ' (' + VA.tiempo + ' s)'));
+}
+function vCerrar(por){ if (V.estado !== 1) return; V.estado = 0; V.mantener = false; V.meta = 0; vSonar(4); vEvento('Puerta CERRADA (' + por + ')'); }
+function vNegar(motivo){
+  V.fallos++; vSonar(2);
+  if (V.fallos >= VA.intentos) {
+    V.estado = 2; V.meta = 0; V.bloqueoHasta = ms() + VA.bloqueo * 1000;
+    vMensaje('!! BLOQUEADA !!', V.fallos + ' intentos mal', 3000);
+    vEvento('BLOQUEO: ' + V.fallos + ' intentos fallidos. Bloqueada ' + VA.bloqueo + ' s');
+  } else {
+    vMensaje('ACCESO DENEGADO', motivo + ' ' + V.fallos + '/' + VA.intentos, 2000);
+    vEvento('Acceso denegado (' + motivo + '). Intento ' + V.fallos + ' de ' + VA.intentos);
+  }
+  vLuz(5);
+}
+const vBuscar = uid => VA.t.findIndex(t => t.uid === uid);
+function vLista(){ VA.t.forEach(t => vEnviar('TL,' + t.uid + ',' + t.admin + ',' + t.activa + ',' + t.nombre)); vEnviar('TL,FIN'); }
+function vTarjeta(uid){
+  if (!V.vivo) return;
+  vLuz(8);
+  if (V.registrando) {
+    V.registrando = false;
+    if (vBuscar(uid) >= 0) { vEnviar('TJ,' + uid + ',0,,YAEXISTE'); vMensaje('Esa tarjeta ya', 'esta registrada', 2000); vSonar(2); vEvento('La tarjeta ' + uid + ' ya estaba registrada'); }
+    else if (VA.t.length >= 10) { vEnviar('TJ,' + uid + ',0,,LLENO'); vMensaje('Memoria llena', 'max 10 tarjetas', 2000); vSonar(2); vEvento('No caben mas tarjetas (maximo 10)'); }
+    else {
+      const t = {uid, admin: (V.regAdmin || VA.t.length === 0) ? 1 : 0, activa:1, nombre: V.regNombre || 'Tarjeta'};
+      VA.t.push(t); vGuardar();
+      vEnviar('TJ,' + uid + ',1,' + t.nombre + ',REGISTRADA'); vMensaje('Tarjeta guardada', t.nombre, 2500); vSonar(5);
+      vEvento('Tarjeta registrada: ' + t.nombre + ' (' + uid + ')' + (t.admin ? ' como ADMINISTRADOR' : ''));
+      vLista();
+    }
+    return;
+  }
+  const i = vBuscar(uid), nom = i >= 0 ? VA.t[i].nombre : '', admin = i >= 0 && VA.t[i].admin;
+  if (V.estado === 4 && !admin) { vEnviar('TJ,' + uid + ',0,' + nom + ',ALARMA'); vEvento('Tarjeta ' + uid + ' rechazada: hay una alarma (solo administrador)'); vSonar(2); return; }
+  if (V.estado === 2 && !admin) { vEnviar('TJ,' + uid + ',0,' + nom + ',BLOQUEADA'); vMensaje('BLOQUEADA', 'espera ' + (Math.floor((V.bloqueoHasta - ms()) / 1000) + 1) + ' s', 1500); vEvento('Tarjeta ' + (nom || uid) + ' ignorada: sistema bloqueado'); vSonar(2); return; }
+  if (V.estado === 3 && !admin) { vEnviar('TJ,' + uid + ',0,' + nom + ',CERRADA'); vMensaje('PUERTA BLOQUEADA', 'solo administr.', 1500); vEvento('Tarjeta ' + (nom || uid) + ' rechazada: puerta bloqueada a mano'); vSonar(2); return; }
+  if (i < 0) { vEnviar('TJ,' + uid + ',0,,DESCONOCIDA'); vEvento('Tarjeta desconocida ' + uid); vNegar('Desconocida'); return; }
+  if (!VA.t[i].activa) { vEnviar('TJ,' + uid + ',0,' + nom + ',DESACTIVADA'); vEvento('Tarjeta desactivada: ' + nom); vNegar('Desactivada'); return; }
+  vEnviar('TJ,' + uid + ',1,' + nom + ',OK');
+  if (V.estado >= 2) vEvento('Administrador ' + nom + ' quita el bloqueo/alarma');
+  vAbrir(nom, false);
+}
+function vCodigo(c){
+  vLuz(8);
+  if (V.estado === 4) { vEnviar('CD,0,ALARMA'); vEvento('Codigo ignorado: hay una alarma (usa SILENCIAR)'); vSonar(2); return; }
+  if (V.estado === 2) { vEnviar('CD,0,BLOQUEADA'); vEvento('Codigo ignorado: sistema bloqueado'); vSonar(2); return; }
+  if (V.estado === 3) { vEnviar('CD,0,CERRADA'); vEvento('Codigo ignorado: puerta bloqueada a mano'); vSonar(2); return; }
+  if (c === VA.pin) { vEnviar('CD,1,OK'); vAbrir('Codigo correcto', false); }
+  else { vEnviar('CD,0,MAL'); vEvento('Codigo incorrecto'); vNegar('Codigo mal'); }
+}
+const lim = s => s.replace(/,/g, ' ').trim().slice(0, 10);
+const clamp = (n, a, b) => Math.max(a, Math.min(b, isNaN(n) ? a : n));
+function vOrden(s){
+  if (!V.vivo) return;
+  s = s.trim();
+  const p = s.indexOf(':'), cmd = (p < 0 ? s : s.slice(0, p)).toUpperCase(), arg = p < 0 ? '' : s.slice(p + 1), n = parseInt(arg, 10);
+  if (cmd === 'CODIGO' || cmd === 'PIN') vCodigo(arg);
+  else if (cmd === 'CAMBIARPIN') {
+    const [vi, nu] = arg.split(':');
+    if (nu === undefined || vi !== VA.pin) { vEvento('No se cambio el codigo: el codigo actual no es correcto'); vSonar(2); }
+    else if (!/^\d{4,6}$/.test(nu)) vEvento('El codigo nuevo debe tener de 4 a 6 numeros');
+    else { VA.pin = nu; vGuardar(); vEvento('Codigo cambiado'); vSonar(1); }
+  }
+  else if (cmd === 'ABRIR') { if (V.estado >= 2) vEvento('Desbloqueo desde el simulador'); vAbrir('Desde simulador', arg === '0'); }
+  else if (cmd === 'CERRAR') { if (V.estado === 1) vCerrar('desde simulador'); else vEvento('La puerta ya esta cerrada'); }
+  else if (cmd === 'BLOQUEAR') { V.estado = 3; V.mantener = false; V.meta = 0; vSonar(4); vMensaje('PUERTA BLOQUEADA', 'solo administr.', 2000); vEvento('Puerta BLOQUEADA a mano: solo abre un administrador'); }
+  else if (cmd === 'DESBLOQUEAR') { if (V.estado === 3 || V.estado === 2) { V.estado = 0; V.fallos = 0; vSonar(1); vEvento('Puerta desbloqueada'); } else vEvento('La puerta no estaba bloqueada'); }
+  else if (cmd === 'PANICO') { V.estado = 4; V.mantener = false; V.meta = 0; vMensaje('!!! ALARMA !!!', 'PANICO', 3000); vEvento('ALARMA DE PANICO activada'); }
+  else if (cmd === 'SILENCIAR') { if (V.estado === 4 || V.estado === 2) { V.estado = 0; V.fallos = 0; V.patron = 0; vEvento('Alarma silenciada'); } else vEvento('No hay alarma que silenciar'); }
+  else if (cmd === 'REGISTRAR') {
+    const [nom, ad] = arg.split(':'); V.regNombre = lim(nom || ''); V.regAdmin = ad === '1';
+    V.registrando = true; V.regHasta = ms() + 15000; vLuz(15); vSonar(4);
+    vMensaje('Acerque tarjeta', 'nueva: ' + V.regNombre, 15000);
+    vEvento('Esperando tarjeta nueva para ' + (V.regNombre || '(sin nombre)') + (V.regAdmin ? ' (administrador)' : '') + ' - 15 s');
+  }
+  else if (cmd === 'CANCELAR') { if (V.registrando) { V.registrando = false; V.msgHasta = 0; vEvento('Registro cancelado'); } }
+  else if (cmd === 'TARJ') {
+    const [uid, ad, ac, ...r] = arg.split(':'); const i = vBuscar((uid || '').toUpperCase());
+    if (i < 0) { vEvento('No existe la tarjeta ' + uid); return; }
+    const t = VA.t[i]; t.admin = ad === '1' ? 1 : 0; t.activa = ac === '1' ? 1 : 0; const nom = lim(r.join(':')); if (nom) t.nombre = nom;
+    vGuardar(); vEvento('Tarjeta ' + t.nombre + ': ' + (t.activa ? 'activa' : 'DESACTIVADA') + (t.admin ? ', administrador' : '')); vLista();
+  }
+  else if (cmd === 'BORRAR') { const i = vBuscar(arg.toUpperCase()); if (i < 0) { vEvento('No existe la tarjeta ' + arg); return; } const nom = VA.t[i].nombre; VA.t.splice(i, 1); vGuardar(); vEvento('Tarjeta borrada: ' + nom); vLista(); }
+  else if (cmd === 'BORRARTODO') { VA.t = []; vGuardar(); vEvento('Se borraron todas las tarjetas. La proxima que registres sera administrador'); vLista(); }
+  else if (cmd === 'LISTA') vLista();
+  else if (cmd === 'TIEMPO') { VA.tiempo = clamp(n, 2, 60); vGuardar(); vEvento('La puerta se queda abierta ' + VA.tiempo + ' s'); }
+  else if (cmd === 'BLOQUEO') { VA.bloqueo = clamp(n, 10, 600); vGuardar(); vEvento('Bloqueo por intentos: ' + VA.bloqueo + ' s'); }
+  else if (cmd === 'INTENTOS') { VA.intentos = clamp(n, 2, 9); vGuardar(); vEvento('Intentos antes del bloqueo: ' + VA.intentos); }
+  else if (cmd === 'ANGULO') { VA.angulo = clamp(n, 30, 180); vGuardar(); if (V.estado === 1) V.meta = VA.angulo; vEvento('Angulo de apertura del servo: ' + VA.angulo + ' grados'); }
+  else if (cmd === 'LUZ') { VA.modoLuz = clamp(n, 0, 2); vGuardar(); vEvento('Luz blanca: ' + ['apagada','prendida','automatica'][VA.modoLuz]); }
+  else if (cmd === 'SONIDO') { VA.sonido = n ? 1 : 0; vGuardar(); vEvento(VA.sonido ? 'Sonido activado' : 'Sonido silenciado (la alarma de panico si suena)'); }
+  else if (cmd === 'PITAR') { pitido(2700, 150, 0, true); S.buzzer = true; setTimeout(() => S.buzzer = false, 150); vEvento('Pitido de prueba'); }
+  else if (cmd === 'TECLA') { vSonar(6); vLuz(10); }
+  else if (cmd === 'PRUEBA') { vEvento('Prueba de luces, buzzer y servo'); vMensaje('PRUEBA', 'luces y servo', 2500); V.prueba = ms(); }
+  else if (cmd === 'REINICIAR') { vEvento('Ajustes de fabrica: codigo 1234, sin tarjetas'); Object.assign(VA, {pin:'1234', tiempo:5, intentos:3, angulo:90, modoLuz:2, sonido:1, bloqueo:30, t:[]}); vGuardar(); V.estado = 0; V.fallos = 0; vLista(); }
+  else if (cmd === 'ESTADO') { vEvento('Puerta de seguridad lista. LCD OK, RFID OK, ' + VA.t.length + ' tarjetas'); V.l1 = ''; vPantalla(p16(V.l1 || ' PUERTA SEGURA'), V.l2); }
+  else if (cmd) { vEvento('Orden desconocida: ' + s); return; }
+  vEstado();
+}
+function vEstado(){
+  if (!V.vivo) return;
+  const t = ms();
+  const rest = V.estado === 1 && !V.mantener ? Math.floor((V.cerrarEn - t) / 1000) + 1 : 0;
+  const bres = V.estado === 2 ? Math.floor((V.bloqueoHasta - t) / 1000) + 1 : 0;
+  vEnviar(['ST', V.estado, +(V.meta > 0), rest, +V.verde, +V.rojo, +V.blanca, VA.modoLuz, V.fallos, VA.intentos, bres, VA.t.length,
+    VA.sonido, VA.tiempo, VA.bloqueo, VA.angulo, 1, 1, +V.registrando, +V.mantener].join(','));
+}
+let tST = 0;
+function vLoop(){
+  if (!V.vivo) return;
+  const t = ms();
+  if (V.registrando && t > V.regHasta) { V.registrando = false; V.msgHasta = 0; vEvento('Registro cancelado (no se acerco ninguna tarjeta)'); }
+  if (V.estado === 1 && !V.mantener && t >= V.cerrarEn) vCerrar('tiempo cumplido');
+  if (V.estado === 2 && t >= V.bloqueoHasta) { V.estado = 0; V.fallos = 0; vEvento('Fin del bloqueo: se puede intentar de nuevo'); }
+  if (V.estado !== 1) V.meta = 0;
+  const parp = Math.floor(t / 250) % 2 === 1;
+  V.verde = V.estado === 1;
+  V.rojo = V.estado === 0 || V.estado === 3 || ((V.estado === 2 || V.estado === 4) && parp);
+  V.blanca = VA.modoLuz === 1 || (VA.modoLuz === 2 && t < V.blancaHasta) || V.estado === 4;
+  if (V.registrando) { V.verde = parp; V.rojo = false; }
+  if (V.prueba && t - V.prueba < 1200) { const k = Math.floor((t - V.prueba) / 300); V.blanca = k === 0; V.verde = k === 1; V.rojo = k === 2; }
+  if (t > V.msgHasta) {
+    const s = Math.floor((V.cerrarEn - t) / 1000) + 1, b = Math.floor((V.bloqueoHasta - t) / 1000) + 1;
+    if (V.estado === 0) vPantalla(' PUERTA SEGURA', 'Tarjeta o codigo');
+    if (V.estado === 1) vPantalla('  PUERTA ABIERTA', V.mantener ? 'hasta cerrar' : 'Cierra en ' + s + ' s');
+    if (V.estado === 2) vPantalla('!! BLOQUEADA !!', 'Espera ' + b + ' s');
+    if (V.estado === 3) vPantalla('PUERTA BLOQUEADA', 'Solo administr.');
+    if (V.estado === 4) vPantalla('!!! ALARMA !!!', parp ? '  PANICO' : '');
+  }
+  // buzzer virtual (para dibujarlo)
+  const e = t - V.patronIni; let on = false;
+  switch (V.patron) { case 1: on = e < 90 || (e > 160 && e < 250); break; case 2: on = e < 700; break; case 4: on = e < 60; break; case 5: on = (e % 200) < 80 && e < 620; break; case 6: on = e < 25; break; }
+  const sirena = V.estado === 4 || (V.estado === 2 && V.bloqueoHasta - t > VA.bloqueo * 1000 - 10000);
+  if (sirena) on = (t % 500) < 300;
+  if (!VA.sonido && V.estado !== 4) on = false;
+  S.buzzer = on;
+  sirenaSim(sirena && (VA.sonido || V.estado === 4));
+  if (t - tST >= 1000) { tST = t; vEstado(); }
+}
+
+/* ================= Sonido en el navegador ================= */
+let ac = null;
+function audio(){ if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch { } } if (ac && ac.state === 'suspended') ac.resume(); return ac; }
+function pitido(f, dur, retraso = 0, forzar = false){
+  const a = audio(); if (!a) return;
+  if (!forzar && S.modo === 'sim' && !VA.sonido) return;
+  const t0 = a.currentTime + retraso / 1000, o = a.createOscillator(), g = a.createGain();
+  o.type = 'square'; o.frequency.value = f; g.gain.setValueAtTime(.0001, t0); g.gain.exponentialRampToValueAtTime(.08, t0 + .01);
+  g.gain.setValueAtTime(.08, t0 + dur / 1000 - .01); g.gain.exponentialRampToValueAtTime(.0001, t0 + dur / 1000);
+  o.connect(g).connect(a.destination); o.start(t0); o.stop(t0 + dur / 1000 + .02);
+}
+function sonidoPatron(p){
+  if (p === 1) { pitido(2700, 90); pitido(2700, 90, 160); }
+  if (p === 2) pitido(1200, 700);
+  if (p === 4) pitido(2700, 60);
+  if (p === 5) { pitido(2700, 80); pitido(2700, 80, 200); pitido(2700, 80, 400); }
+  if (p === 6) pitido(2700, 25);
+}
+let sirOsc = null, sirGain = null;
+function sirenaSim(on){
+  const a = on ? audio() : ac; if (!a) return;
+  if (on && !sirOsc) {
+    sirOsc = a.createOscillator(); sirGain = a.createGain(); sirOsc.type = 'square'; sirOsc.frequency.value = 2400;
+    sirGain.gain.value = 0; sirOsc.connect(sirGain).connect(a.destination); sirOsc.start();
+  }
+  if (sirOsc) sirGain.gain.setTargetAtTime(on && (Date.now() % 500) < 300 ? .07 : 0, a.currentTime, .005);
+  if (!on && sirOsc) { const o = sirOsc; setTimeout(() => { try { o.stop(); } catch { } }, 50); sirOsc = null; }
+}
+
+/* ================= Historial ================= */
+const HKEY = 'puerta-seguridad-historial-v1';
+let hist = JSON.parse(localStorage.getItem(HKEY) || '[]');
+let filtro = 'todo';
+function claseDe(txt){
+  if (/ABIERTA|registrada:|desbloqueada|silenciada|Codigo cambiado|quita el bloqueo/i.test(txt)) return 'ok';
+  if (/ALARMA|BLOQUEO:|BLOQUEADA a mano|Se perdio/i.test(txt)) return 'alr';
+  if (/denegad|desconocida|incorrecto|rechazada|ignorad|No se|desactivada|No caben|ya estaba/i.test(txt)) return 'mal';
+  return '';
+}
+const ICON = {ok:'✅', mal:'⛔', alr:'🚨', yo:'👆', '':'•'};
+function anotar(txt, clase){
+  clase = clase ?? claseDe(txt);
+  hist.push({h:hora(), d:new Date().toLocaleDateString('es'), t:txt, c:clase, m:S.modo});
+  if (hist.length > 400) hist = hist.slice(-400);
+  localStorage.setItem(HKEY, JSON.stringify(hist));
+  pintarHist();
+}
+function pintarHist(){
+  const caja = $('hist'), abajo = caja.scrollTop + caja.clientHeight >= caja.scrollHeight - 30;
+  caja.innerHTML = hist.filter(x => filtro === 'todo' || x.c === filtro)
+    .map(x => `<div class="h ${x.c}"><time title="${x.d}">${x.h}</time><span>${ICON[x.c] || '•'}</span><span>${esc(x.t)}${x.m === 'real' ? '' : ' <span style="color:var(--mute);font-size:11px">(sim)</span>'}</span></div>`).join('')
+    || '<p class="nota">Todavía no pasa nada. Escribe el código o pasa una tarjeta.</p>';
+  if (abajo) caja.scrollTop = caja.scrollHeight;
+  const c = k => hist.filter(x => x.c === k).length;
+  $('sOk').textContent = hist.filter(x => /Puerta ABIERTA/.test(x.t)).length;
+  $('sNo').textContent = hist.filter(x => /Acceso denegado|BLOQUEO:/.test(x.t)).length;
+  $('sBl').textContent = hist.filter(x => /BLOQUEO:|BLOQUEADA a mano/.test(x.t)).length;
+  $('sAl').textContent = hist.filter(x => /ALARMA DE PANICO/.test(x.t)).length;
+}
+$('filtros').onclick = e => { const b = e.target.closest('button'); if (!b) return; filtro = b.dataset.f; [...$('filtros').children].forEach(x => x.classList.toggle('act', x === b)); pintarHist(); };
+$('bLimpiar').onclick = () => { hist = []; localStorage.setItem(HKEY, '[]'); pintarHist(); toast('Historial borrado'); };
+$('bExport').onclick = () => {
+  const txt = 'Historial de la Puerta de Seguridad\n\n' + hist.map(x => `${x.d} ${x.h}  ${x.t}${x.m === 'real' ? '' : ' (simulación)'}`).join('\n');
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([txt], {type:'text/plain'})); a.download = 'historial-puerta.txt'; a.click();
+};
+
+/* ================= Monitor ================= */
+const mon = [];
+function monitor(dir, txt){
+  if (txt.startsWith('ST,') && !$('verST').checked) return;
+  mon.push(`<span class="${dir}">${dir === 'tx' ? '→' : '←'} ${esc(txt)}</span>`);
+  if (mon.length > 300) mon.shift();
+  const m = $('monitor'); m.innerHTML = mon.join('\n'); m.scrollTop = m.scrollHeight;
+}
+
+/* ================= Recibir del Arduino (real o virtual) ================= */
+let ultimaTarjeta = null;
+function recibirLinea(l){
+  l = l.trim(); if (!l) return;
+  monitor('rx', l);
+  const p = l.split(','), tipo = p[0];
+  if (tipo === 'ST' && p.length >= 20) {
+    const n = p.slice(1).map(Number);
+    const antes = S.estado;
+    [S.estado, S.abierta, S.restante, S.verde, S.rojo, S.blanca, S.modoLuz, S.fallos, S.intentos, S.bloqRest, S.nTarj, S.sonido,
+     S.tiempo, S.bloqueo, S.angulo, S.lcdOk, S.rfidOk, S.registrando, S.mantener] = n;
+    S.ultimoST = Date.now();
+    if (S.modo === 'real' && S.estado === 4 && antes !== 4) toast('🚨 ALARMA en la puerta');
+  }
+  else if (tipo === 'EV') anotar(p.slice(1).join(','));
+  else if (tipo === 'LC') { S.l1 = p[1] ?? ''; S.l2 = p.slice(2).join(',') ?? ''; }
+  else if (tipo === 'TL') {
+    if (p[1] === 'FIN') { S.lista = S.listaNueva || []; S.listaNueva = null; pintarTarjetas(); pintarBilletera(); }
+    else (S.listaNueva = S.listaNueva || []).push({uid:p[1], admin:+p[2], activa:+p[3], nombre:p.slice(4).join(',')});
+  }
+  else if (tipo === 'TJ') {
+    const ok = p[2] === '1', mot = p[4];
+    const z = $('zona'); z.classList.remove('leyendo', 'si', 'no'); z.classList.add(ok ? 'si' : 'no');
+    $('zonaTxt').textContent = ok ? (mot === 'REGISTRADA' ? 'Guardada' : 'Aceptada') : ({DESCONOCIDA:'Desconocida', DESACTIVADA:'Desactivada', BLOQUEADA:'Bloqueado', CERRADA:'Bloqueada', ALARMA:'Alarma', YAEXISTE:'Ya existe', LLENO:'Memoria llena'}[mot] || 'Rechazada');
+    clearTimeout(ultimaTarjeta); ultimaTarjeta = setTimeout(() => { z.classList.remove('si', 'no'); $('zonaTxt').textContent = 'Lector RFID'; }, 1800);
+    if (mot === 'REGISTRADA') toast('Tarjeta guardada: ' + p[3]);
+  }
+  else if (tipo === 'CD') {
+    const pt = $('pantallita'); pt.classList.remove('mal', 'bien'); void pt.offsetWidth;
+    pt.classList.add(p[1] === '1' ? 'bien' : 'mal');
+    pt.innerHTML = p[1] === '1' ? '<span style="color:var(--verde);font-size:15px;letter-spacing:0">✓ Código correcto</span>'
+      : `<span style="color:var(--rojo);font-size:15px;letter-spacing:0">${({MAL:'✕ Código incorrecto', BLOQUEADA:'Bloqueado: espera', CERRADA:'Puerta bloqueada', ALARMA:'Hay una alarma'})[p[2]] || '✕ No'}</span>`;
+    setTimeout(() => { if (!codigo) pintarCodigo(); }, 1600);
+  }
+}
+
+/* ================= Enviar ================= */
+let puerto = null, lector = null, escritor = null;
+async function enviar(c, yo){
+  monitor('tx', c);
+  if (yo) anotar(yo, 'yo');
+  if (S.modo === 'sim') { setTimeout(() => vOrden(c), 60); return; }
+  try { await escritor.write(new TextEncoder().encode(c + '\n')); }
+  catch (e) { anotar('No se pudo enviar: ' + (e.message || e), 'mal'); }
+}
+
+/* ================= Conexión (Web Serial: HC-05 por Bluetooth o USB) ================= */
+const SPP = '00001101-0000-1000-8000-00805f9b34fb';
+let buffer = '';
+async function conectar(bt){
+  if (!('serial' in navigator)) { toast('Este navegador no puede conectarse. Usa Chrome o Edge (en Android, Chrome).'); return; }
+  try {
+    let pt;
+    if (bt) {
+      try { pt = await navigator.serial.requestPort({ allowedBluetoothServiceClassIds:[SPP], filters:[{ bluetoothServiceClassId:SPP }] }); }
+      catch (e) { if (e.name === 'NotFoundError') throw e; pt = await navigator.serial.requestPort(); }
+    } else pt = await navigator.serial.requestPort();
+    await pt.open({ baudRate:9600 });
+    puerto = pt; escritor = pt.writable.getWriter();
+    S.modo = 'real'; V.vivo = false; sirenaSim(false); S.ultimoST = Date.now(); S.lista = [];
+    $('bDesc').disabled = false;
+    anotar('Conectado al Arduino real por ' + (bt ? 'Bluetooth (HC-05)' : 'USB'), 'yo');
+    leerSerial();
+    setTimeout(() => enviar('ESTADO'), 1200); setTimeout(() => enviar('ESTADO'), 2200); setTimeout(() => enviar('LISTA'), 3000);
+    pintarBilletera();
+  } catch (e) {
+    if (e.name === 'NotFoundError') toast('No elegiste ningún equipo. ¿Emparejaste el HC-05?');
+    else toast('No se pudo conectar: ' + (e.message || e));
+  }
+}
+async function leerSerial(){
+  const dec = new TextDecoder();
+  while (puerto && puerto.readable) {
+    lector = puerto.readable.getReader();
+    try {
+      for (;;) {
+        const {value, done} = await lector.read(); if (done) break;
+        buffer += dec.decode(value, {stream:true});
+        let i; while ((i = buffer.search(/[\r\n]/)) >= 0) { const l = buffer.slice(0, i); buffer = buffer.slice(i + 1); recibirLinea(l); }
+      }
+    } catch (e) { anotar('Se perdió la conexión con el Arduino', 'alr'); break; }
+    finally { try { lector.releaseLock(); } catch { } }
+  }
+}
+async function desconectar(){
+  try { if (lector) await lector.cancel(); } catch { }
+  try { if (escritor) escritor.releaseLock(); } catch { }
+  try { if (puerto) await puerto.close(); } catch { }
+  puerto = lector = escritor = null;
+  S.modo = 'sim'; V.vivo = true; $('bDesc').disabled = true;
+  anotar('Desconectado: vuelve la simulación', 'yo');
+  vLista(); vEstado(); pintarBilletera();
+}
+$('bBt').onclick = () => conectar(true);
+$('bUsb').onclick = () => conectar(false);
+$('bDesc').onclick = desconectar;
+
+/* ================= Teclado del código ================= */
+let codigo = '';
+function pintarCodigo(){
+  const pt = $('pantallita'); pt.classList.remove('mal', 'bien');
+  pt.innerHTML = codigo ? '●'.repeat(codigo.length) : '<span style="color:var(--mute);font-size:14px;letter-spacing:0">Escribe el código</span>';
+}
+['1','2','3','4','5','6','7','8','9','⌫','0','OK'].forEach(k => {
+  const b = document.createElement('button'); b.textContent = k;
+  if (k === 'OK') b.className = 'k-ok'; if (k === '⌫') b.className = 'k-bor';
+  b.onclick = () => tecla(k); $('teclado').appendChild(b);
+});
+function tecla(k){
+  audio();
+  if (k === '⌫') codigo = codigo.slice(0, -1);
+  else if (k === 'OK') { if (codigo.length < 4) { toast('El código tiene de 4 a 6 números'); return; } const c = codigo; codigo = ''; enviar('CODIGO:' + c, 'Escribí un código en el teclado'); return; }
+  else if (codigo.length < 6) { if (!codigo) enviar('TECLA'); else if (S.modo === 'sim') vOrden('TECLA'); codigo += k; }
+  pintarCodigo();
+}
+document.addEventListener('keydown', e => {
+  if (e.target.matches('input,select,textarea')) return;
+  if (/^\d$/.test(e.key)) tecla(e.key);
+  else if (e.key === 'Backspace') tecla('⌫');
+  else if (e.key === 'Enter') tecla('OK');
+});
+
+/* ================= Billetera de tarjetas (simulación) ================= */
+const FISICAS = [
+  {uid:'A3F1220C', tipo:'Tarjeta blanca', color:'linear-gradient(135deg,#e9edf2,#b8c1cc)', txt:'#1a1d22'},
+  {uid:'5B7C9E11', tipo:'Llavero azul', color:'linear-gradient(135deg,#2f6fd6,#163b80)'},
+  {uid:'C4D2E9A7', tipo:'Tarjeta nueva', color:'linear-gradient(135deg,#3b8f5a,#1c4f30)'},
+  {uid:'DEADBEEF', tipo:'Tarjeta extraña', color:'linear-gradient(135deg,#8a2b2b,#4a1414)'}
+];
+function pintarBilletera(){
+  const b = $('billetera');
+  if (S.modo === 'real') {
+    b.innerHTML = '';
+    $('billNota').innerHTML = 'Conectado al Arduino real: <b>pasa una tarjeta por el lector RC522</b>. Aquí verás si la acepta.';
+    return;
+  }
+  $('billNota').textContent = 'Toca una tarjeta para acercarla al lector.';
+  b.innerHTML = FISICAS.map(f => {
+    const r = S.lista.find(t => t.uid === f.uid);
+    const etq = r ? (r.activa ? (r.admin ? 'admin' : 'registrada') : 'desactivada') : 'no registrada';
+    return `<button class="tarjeta-v" data-uid="${f.uid}" style="background:${f.color};color:${f.txt || '#fff'}"><span class="etq">${etq}</span><b>${esc(r ? r.nombre : f.tipo)}</b><small>${f.tipo === (r && r.nombre) ? '' : esc(f.tipo) + ' · '}${f.uid}</small></button>`;
+  }).join('');
+}
+$('billetera').onclick = e => {
+  const b = e.target.closest('.tarjeta-v'); if (!b) return;
+  audio();
+  b.classList.remove('volando'); void b.offsetWidth; b.classList.add('volando');
+  const z = $('zona'); z.classList.remove('si', 'no'); z.classList.add('leyendo'); $('zonaTxt').textContent = 'Leyendo…';
+  const f = FISICAS.find(x => x.uid === b.dataset.uid);
+  anotar('Acerqué la ' + f.tipo.toLowerCase() + ' al lector', 'yo');
+  setTimeout(() => { vTarjeta(b.dataset.uid); vEstado(); }, 350);
+};
+
+/* ================= Tarjetas guardadas ================= */
+function pintarTarjetas(){
+  $('nT').textContent = '(' + S.lista.length + ' de 10)';
+  $('listaT').innerHTML = S.lista.map(t => `
+    <div class="lt ${t.activa ? '' : 'off'}">
+      <div><div class="nom">${esc(t.nombre)} ${t.admin ? '<span class="chip" style="color:var(--amb)">admin</span>' : ''} ${t.activa ? '' : '<span class="chip">desactivada</span>'}</div><small>${t.uid}</small></div>
+      <div class="acc">
+        <button data-k="act" data-u="${t.uid}">${t.activa ? 'Desactivar' : 'Activar'}</button>
+        <button data-k="adm" data-u="${t.uid}">${t.admin ? 'Quitar admin' : 'Hacer admin'}</button>
+        <button data-k="nom" data-u="${t.uid}">Nombre</button>
+        <button data-k="bor" data-u="${t.uid}" class="mal">Borrar</button>
+      </div>
+    </div>`).join('') || '<p class="nota">No hay tarjetas. La primera que registres será administrador.</p>';
+}
+$('listaT').onclick = e => {
+  const b = e.target.closest('button'); if (!b) return;
+  const t = S.lista.find(x => x.uid === b.dataset.u); if (!t) return;
+  if (b.dataset.k === 'bor') { if (b.dataset.seguro) enviar('BORRAR:' + t.uid, 'Borré la tarjeta de ' + t.nombre); else { b.dataset.seguro = 1; b.textContent = '¿Seguro?'; setTimeout(() => { delete b.dataset.seguro; b.textContent = 'Borrar'; }, 2500); } }
+  if (b.dataset.k === 'act') enviar(`TARJ:${t.uid}:${t.admin}:${t.activa ? 0 : 1}:${t.nombre}`, (t.activa ? 'Desactivé' : 'Activé') + ' la tarjeta de ' + t.nombre);
+  if (b.dataset.k === 'adm') enviar(`TARJ:${t.uid}:${t.admin ? 0 : 1}:${t.activa}:${t.nombre}`, (t.admin ? 'Quité administrador a ' : 'Hice administrador a ') + t.nombre);
+  if (b.dataset.k === 'nom') {
+    const fila = b.closest('.lt'), nomDiv = fila.querySelector('.nom');
+    nomDiv.innerHTML = `<div class="fila"><input maxlength="10" value="${esc(t.nombre)}"><button style="flex:0 0 auto">OK</button></div>`;
+    const inp = nomDiv.querySelector('input'); inp.focus(); inp.select();
+    const ok = () => { const v = lim(inp.value); if (v && v !== t.nombre) enviar(`TARJ:${t.uid}:${t.admin}:${t.activa}:${v}`, 'Cambié el nombre de ' + t.nombre + ' a ' + v); else pintarTarjetas(); };
+    nomDiv.querySelector('button').onclick = ok; inp.onkeydown = ev => { if (ev.key === 'Enter') ok(); if (ev.key === 'Escape') pintarTarjetas(); };
+  }
+};
+$('bReg').onclick = () => {
+  const nom = lim($('regNom').value) || 'Tarjeta';
+  enviar('REGISTRAR:' + nom + ($('regAdm').checked ? ':1' : ''), 'Pedí registrar una tarjeta para ' + nom);
+  $('regNom').value = ''; $('regAdm').checked = false;
+  toast(S.modo === 'sim' ? 'Ahora toca la “Tarjeta nueva” (verde) en la izquierda' : 'Acerca la tarjeta nueva al lector (15 s)');
+};
+$('bCan').onclick = () => enviar('CANCELAR', 'Cancelé el registro');
+$('bBorrarTodo').onclick = function(){ if (this.dataset.seguro) { enviar('BORRARTODO', 'Borré todas las tarjetas'); delete this.dataset.seguro; this.textContent = 'Borrar todas'; } else { this.dataset.seguro = 1; this.textContent = '¿Seguro? toca otra vez'; setTimeout(() => { delete this.dataset.seguro; this.textContent = 'Borrar todas'; }, 3000); } };
+
+/* ================= Control y ajustes ================= */
+const QUE = {ABRIR:'Abrí la puerta desde el simulador', 'ABRIR:0':'Dejé la puerta abierta', CERRAR:'Cerré la puerta', BLOQUEAR:'Bloqueé la puerta', DESBLOQUEAR:'Desbloqueé la puerta', PANICO:'Activé la alarma de pánico', SILENCIAR:'Silencié la alarma', PRUEBA:'Probé luces, buzzer y servo', PITAR:'Hice pitar el buzzer'};
+$('t-control').querySelectorAll('[data-c]').forEach(b => b.onclick = () => { audio(); enviar(b.dataset.c, QUE[b.dataset.c]); });
+$('segLuz').onclick = e => { const b = e.target.closest('button'); if (b) enviar('LUZ:' + b.dataset.v, 'Puse la luz blanca en ' + b.textContent.toLowerCase()); };
+$('segSon').onclick = e => { const b = e.target.closest('button'); if (b) enviar('SONIDO:' + b.dataset.v, b.dataset.v === '1' ? 'Activé el sonido' : 'Silencié el buzzer'); };
+document.querySelectorAll('[data-a]').forEach(b => b.onclick = () => {
+  const id = {TIEMPO:'aTiempo', INTENTOS:'aIntentos', BLOQUEO:'aBloqueo', ANGULO:'aAngulo'}[b.dataset.a];
+  const v = $(id).value; enviar(b.dataset.a + ':' + v, 'Cambié ' + $(id).closest('.campo').querySelector('label').textContent.toLowerCase() + ' a ' + v);
+  $(id).dataset.tocado = '';
+});
+['aTiempo','aIntentos','aBloqueo','aAngulo'].forEach(id => $(id).oninput = () => $(id).dataset.tocado = '1');
+$('bPin').onclick = () => {
+  const v = $('pinV').value, n = $('pinN').value;
+  if (!/^\d{4,6}$/.test(n)) { toast('El código nuevo debe tener de 4 a 6 números'); return; }
+  enviar('CAMBIARPIN:' + v + ':' + n, 'Pedí cambiar el código'); $('pinV').value = $('pinN').value = '';
+};
+$('bOrden').onclick = () => { const v = $('ordenTxt').value.trim(); if (v) { enviar(v, 'Envié la orden ' + v); $('ordenTxt').value = ''; } };
+$('ordenTxt').onkeydown = e => { if (e.key === 'Enter') $('bOrden').click(); };
+$('bFab').onclick = function(){ if (this.dataset.seguro) { enviar('REINICIAR', 'Volví a los ajustes de fábrica'); delete this.dataset.seguro; this.textContent = 'Volver a fábrica (código 1234, sin tarjetas)'; } else { this.dataset.seguro = 1; this.textContent = '¿Seguro? Se borran las tarjetas. Toca otra vez'; setTimeout(() => { delete this.dataset.seguro; this.textContent = 'Volver a fábrica (código 1234, sin tarjetas)'; }, 3000); } };
+$('tabs').onclick = e => { const b = e.target.closest('button'); if (!b) return; [...$('tabs').children].forEach(x => x.classList.toggle('act', x === b)); document.querySelectorAll('.tab').forEach(t => t.hidden = t.id !== 't-' + b.dataset.t); };
+
+let toastT;
+function toast(t){ const el = $('toast'); el.textContent = t; el.classList.add('ver'); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('ver'), 3200); }
+
+/* ================= Dibujar ================= */
+let angDib = 0;
+function pintar(){
+  const vivo = Date.now() - S.ultimoST < 4000;
+  $('modo').textContent = S.modo === 'sim' ? 'Simulación' : vivo ? 'Arduino conectado' : 'Sin respuesta';
+  $('modo').className = 'pill ' + (S.modo === 'sim' ? '' : vivo ? 'real' : 'caido');
+  $('marco').classList.toggle('abierta', !!S.abierta);
+  const meta = S.abierta ? S.angulo : 0; angDib += Math.sign(meta - angDib) * Math.min(12, Math.abs(meta - angDib));
+  $('brazo').style.transform = `rotate(${angDib}deg)`;
+  $('servoTxt').textContent = 'Servo: ' + Math.round(angDib) + '°';
+  $('ledB').classList.toggle('on', !!S.blanca); $('ledV').classList.toggle('on', !!S.verde); $('ledR').classList.toggle('on', !!S.rojo);
+  $('buz').classList.toggle('on', S.modo === 'sim' ? S.buzzer : (S.estado === 4 || (S.estado === 2 && (Date.now() % 500) < 300)));
+  $('lcd').textContent = p16(S.l1) + '\n' + p16(S.l2);
+  $('lcd').classList.toggle('apagada', !S.lcdOk);
+  $('estTxt').textContent = NOMBRE_EST[S.estado] || '—';
+  $('estTxt').style.color = ['var(--rojo)','var(--verde)','var(--amb)','var(--amb)','var(--rojo)'][S.estado];
+  $('estChip').textContent = S.estado === 1 ? (S.mantener ? 'abierta hasta cerrar' : 'se cierra en ' + S.restante + ' s') : S.estado === 2 ? 'espera ' + S.bloqRest + ' s' : S.registrando ? 'esperando tarjeta nueva' : 'tarjeta o código';
+  $('intChip').textContent = 'intentos fallidos ' + S.fallos + '/' + S.intentos;
+  [...$('segLuz').children].forEach(b => b.classList.toggle('act', +b.dataset.v === S.modoLuz));
+  [...$('segSon').children].forEach(b => b.classList.toggle('act', +b.dataset.v === S.sonido));
+  [['aTiempo', S.tiempo], ['aIntentos', S.intentos], ['aBloqueo', S.bloqueo], ['aAngulo', S.angulo]].forEach(([id, v]) => { if (document.activeElement !== $(id) && !$(id).dataset.tocado) $(id).value = v; });
+  const si = (b, a = 'Sí', n = 'No') => b ? `<span style="color:var(--verde)">${a}</span>` : `<span style="color:var(--rojo)">${n}</span>`;
+  $('tablaEstado').innerHTML = `
+    <tr><td>Puerta</td><td>${NOMBRE_EST[S.estado]}</td></tr>
+    <tr><td>Servo (cerrojo)</td><td>${S.abierta ? 'abierto a ' + S.angulo + '°' : 'cerrado a 0°'}</td></tr>
+    <tr><td>Luces</td><td>blanca ${si(S.blanca,'prendida','apagada')} · verde ${si(S.verde,'prendida','apagada')} · roja ${si(S.rojo,'prendida','apagada')}</td></tr>
+    <tr><td>Tarjetas guardadas</td><td>${S.nTarj} de 10</td></tr>
+    <tr><td>Lector RFID</td><td>${si(S.rfidOk,'funciona','no se encuentra')}</td></tr>
+    <tr><td>Pantalla LCD</td><td>${si(S.lcdOk,'funciona','no se encuentra')}</td></tr>
+    <tr><td>Conexión</td><td>${S.modo === 'sim' ? 'simulación (sin Arduino)' : si(vivo,'responde','no responde')}</td></tr>`;
+  const ban = S.estado === 4 ? '🚨 ALARMA DE PÁNICO — pulsa “Silenciar” o pasa una tarjeta de administrador'
+    : S.estado === 2 ? `⛔ Demasiados intentos fallidos: bloqueada ${S.bloqRest} s` : (S.modo === 'real' && !vivo) ? '⚠ El Arduino no responde: revisa el Bluetooth' : '';
+  $('banner').textContent = ban; $('banner').classList.toggle('ver', !!ban);
+}
+
+setInterval(() => { if (S.modo === 'sim') vLoop(); pintar(); }, 100);
+pintarHist(); pintarCodigo();
+vLista(); vEnviar('EV,Simulador listo (codigo de fabrica 1234)'); vEstado();
+setTimeout(pintarBilletera, 80);
+})();
+</script>
+</body>
+</html>
